@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# $2 = commit source (message|template|merge|squash|commit|...)
+# If user used -m/-F, or it's a merge/squash, don't hijack.
+case "$2" in
+  message|merge|squash|commit) exit 0 ;;
+esac
+
+# Run Commitizen wizard and write into commit message file
+# /dev/tty allows interactive prompt even inside git hook
+if [ -z "$SKIP_CZ" ]; then
+  exec < /dev/tty && pnpm -s cz --hook || true
+fi

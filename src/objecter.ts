@@ -1,0 +1,436 @@
+import { MappingError, ValidationError } from './errors';
+import { MappingOptions, Constructor, FieldMapping, MappingContext } from './types';
+import { getNestedValue, isPlainObject, deepClone, setNestedValue, normalizeValidator } from './utils';
+
+/**
+ * Objecter - A lightweight object mapping library for TypeScript
+ * Similar to MapStruct (Java) but without decorators
+ */
+
+/**
+ * Objecter - Main class for object mapping and transformation
+ *
+ * @example
+ * ```typescript
+ * class User {
+ *   id: number;
+ *   name: string;
+ *   email: string;
+ *   password: string;
+ * }
+ *
+ * class UserDto {
+ *   id: number;
+ *   name: string;
+ *   email: string;
+ * }
+ *
+ * const mapping = [
+ *   { from: 'id', to: 'id' },
+ *   { from: 'name', to: 'name', transform: (v) => v.toUpperCase() },
+ *   { from: 'email', to: 'email' },
+ * ];
+ *
+ * const userDto = Objecter.convert(user, UserDto, mapping);
+ * ```
+ */
+export class Objecter {
+  /**
+   * Default mapping options
+   */
+  private static readonly DEFAULT_OPTIONS: Required<MappingOptions> = {
+    throwOnValidationError: true,
+    throwOnMissingFields: true,
+    copyUndefined: false,
+    context: {},
+    strictMapping: true,
+    autoMap: false,
+  };
+
+  /**
+   * Converts a source object to a target class instance using the provided mapping
+   *
+   * @param source - Source object to convert
+   * @param targetClass - Target class constructor
+   * @param mapping - Array of field mappings
+   * @param options - Optional mapping configuration
+   * @returns New instance of targetClass with mapped values
+   * @throws {MappingError} When a required field is missing
+   * @throws {ValidationError} When validation fails
+   */
+  public static convert<TSource, TTarget>(
+    source: TSource,
+    targetClass: Constructor<TTarget>,
+    mapping: FieldMapping[],
+    options?: MappingOptions,
+  ): TTarget {
+    if (source === null || source === undefined) {
+      throw new MappingError('Source object cannot be null or undefined', 'source', source);
+    }
+
+    const mergedOptions = { ...this.DEFAULT_OPTIONS, ...options };
+    const target = new targetClass();
+    const context: MappingContext = { source, targetType: targetClass, data: mergedOptions.context };
+
+    const validationErrors = new Map<string, string[]>();
+
+    // Track which target properties have been explicitly mapped
+    const mappedTargetProps = new Set<string>();
+
+    for (const fieldMap of mapping) {
+      // Track the target property being mapped
+      mappedTargetProps.add(fieldMap.to || fieldMap.from);
+      try {
+        this.processFieldMapping(
+          source,
+          target as Record<string, unknown>,
+          fieldMap,
+          context,
+          mergedOptions,
+          validationErrors,
+        );
+      } catch (error) {
+        if (error instanceof MappingError) {
+          // Prepend current field to the error path to create full path
+          // Create new error to preserve stack but update message/field
+          const newField = `${fieldMap.from}.${error.field}`;
+          throw new MappingError(
+            error.message.replace(error.field, newField),
+            newField,
+            error.sourceValue,
+            error.errors,
+          );
+        }
+        if (error instanceof ValidationError) {
+          // For ValidationErrors, we might want to context them too, but they are map-based.
+          // Leaving as is for now or could map keys.
+          throw error;
+        }
+
+        throw new MappingError(
+          `Error mapping field '${fieldMap.from}': ${(error as Error).message}`,
+          fieldMap.from,
+          getNestedValue(source, fieldMap.from),
+        );
+      }
+    }
+
+    // AutoMap: automatically copy properties with matching names not explicitly mapped
+    if (mergedOptions.autoMap && isPlainObject(source)) {
+      const targetInstance = target as Record<string, unknown>;
+      const sourceObj = source as Record<string, unknown>;
+
+      // OPTIMIZATION: Iterate over target keys (schema) instead of source keys (data)
+      // This prevents performance issues when source object is massive but target is small.
+      // We check own properties of the empty target instance and its prototype.
+      const targetKeys = new Set([
+        ...Object.getOwnPropertyNames(targetInstance),
+        ...Object.getOwnPropertyNames(targetClass.prototype),
+      ]);
+
+      for (const key of targetKeys) {
+        // Skip constructor and internal props
+        if (key === 'constructor') continue;
+
+        // Skip if this property was already explicitly mapped
+        if (mappedTargetProps.has(key)) {
+          continue;
+        }
+
+        // Check if source has this property
+        if (Object.prototype.hasOwnProperty.call(sourceObj, key)) {
+          const value = sourceObj[key];
+
+          // Skip undefined values unless copyUndefined is true
+          if (value === undefined && !mergedOptions.copyUndefined) {
+            continue;
+          }
+
+          // Deep clone to prevent mutation
+          targetInstance[key] = deepClone(value);
+        }
+      }
+    }
+
+    // Throw validation errors if any accumulated
+    if (validationErrors.size > 0 && mergedOptions.throwOnValidationError) {
+      const errorMessages = Array.from(validationErrors.entries())
+        .map(([field, errors]) => `${field}: ${errors.join(', ')}`)
+        .join('; ');
+      throw new ValidationError(`Validation failed: ${errorMessages}`, validationErrors);
+    }
+
+    return target;
+  }
+
+  /**
+   * Converts an array of source objects to target class instances
+   *
+   * @param sources - Array of source objects
+   * @param targetClass - Target class constructor
+   * @param mapping - Array of field mappings
+   * @param options - Optional mapping configuration
+   * @returns Array of target class instances
+   */
+  public static convertArray<TSource, TTarget>(
+    sources: TSource[],
+    targetClass: Constructor<TTarget>,
+    mapping: FieldMapping[],
+    options?: MappingOptions,
+  ): TTarget[] {
+    if (!Array.isArray(sources)) {
+      throw new MappingError('Source must be an array', 'sources', sources);
+    }
+
+    return sources.map((source, index) => {
+      try {
+        return this.convert(source, targetClass, mapping, options);
+      } catch (error) {
+        if (error instanceof MappingError) {
+          throw new MappingError(
+            `Error at index ${index}: ${error.message}`,
+            `[${index}].${error.field}`,
+            error.sourceValue,
+            error.errors,
+          );
+        }
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Converts an array of source objects to target class instances using a generator
+   * Useful for processing large arrays without holding all results in memory
+   *
+   * @param sources - Array of source objects
+   * @param targetClass - Target class constructor
+   * @param mapping - Array of field mappings
+   * @param options - Optional mapping configuration
+   * @yields Target class instance
+   */
+  public static *convertArrayGenerator<TSource, TTarget>(
+    sources: TSource[],
+    targetClass: Constructor<TTarget>,
+    mapping: FieldMapping[],
+    options?: MappingOptions,
+  ): Generator<TTarget> {
+    if (!Array.isArray(sources)) {
+      throw new MappingError('Source must be an array', 'sources', sources);
+    }
+
+    for (let index = 0; index < sources.length; index++) {
+      const source = sources[index];
+      try {
+        yield this.convert(source, targetClass, mapping, options);
+      } catch (error) {
+        if (error instanceof MappingError) {
+          throw new MappingError(
+            `Error at index ${index}: ${error.message}`,
+            `[${index}].${error.field}`,
+            error.sourceValue,
+            error.errors,
+          );
+        }
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Creates a mapper function that can be reused for multiple conversions
+   *
+   * @param targetClass - Target class constructor
+   * @param mapping - Array of field mappings
+   * @param options - Optional mapping configuration
+   * @returns Reusable mapper function
+   */
+  public static createMapper<TSource, TTarget>(
+    targetClass: Constructor<TTarget>,
+    mapping: FieldMapping[],
+    options?: MappingOptions,
+  ): (source: TSource, _parent?: unknown, context?: MappingContext) => TTarget {
+    // Validate mapping configuration at creation time for early error detection
+    this.validateMappingConfig(mapping);
+
+    return (source: TSource, _parent?: unknown, context?: MappingContext) => {
+      const runtimeOptions = { ...options };
+      if (context && context.data) {
+        runtimeOptions.context = { ...options?.context, ...context.data };
+      }
+      return this.convert(source, targetClass, mapping, runtimeOptions);
+    };
+  }
+
+  /**
+   * Creates an array mapper function that can be reused
+   *
+   * @param targetClass - Target class constructor
+   * @param mapping - Array of field mappings
+   * @param options - Optional mapping configuration
+   * @returns Reusable array mapper function
+   */
+  public static createArrayMapper<TSource, TTarget>(
+    targetClass: Constructor<TTarget>,
+    mapping: FieldMapping[],
+    options?: MappingOptions,
+  ): (sources: TSource[], _parent?: unknown, context?: MappingContext) => TTarget[] {
+    this.validateMappingConfig(mapping);
+
+    return (sources: TSource[], _parent?: unknown, context?: MappingContext) => {
+      const runtimeOptions = { ...options };
+      if (context && context.data) {
+        runtimeOptions.context = { ...options?.context, ...context.data };
+      }
+      return this.convertArray(sources, targetClass, mapping, runtimeOptions);
+    };
+  }
+
+  /**
+   * Merges multiple objects into a target class instance
+   * Later sources override earlier ones for conflicting properties
+   *
+   * @param sources - Array of source objects to merge
+   * @param targetClass - Target class constructor
+   * @param mapping - Array of field mappings
+   * @param options - Optional mapping configuration
+   * @returns Merged target class instance
+   */
+  public static merge<TTarget>(
+    sources: unknown[],
+    targetClass: Constructor<TTarget>,
+    mapping: FieldMapping[],
+    options?: MappingOptions,
+  ): TTarget {
+    const mergedSource: Record<string, unknown> = {};
+
+    for (const source of sources) {
+      if (source && typeof source === 'object') {
+        Object.assign(mergedSource, deepClone(source));
+      }
+    }
+
+    return this.convert(mergedSource, targetClass, mapping, options);
+  }
+
+  /**
+   * Converts object to a plain object (strips class prototype)
+   *
+   * @param source - Source object
+   * @param mapping - Optional field mappings (if not provided, copies all fields)
+   * @returns Plain object with mapped values
+   */
+  public static toPlainObject<TSource>(source: TSource, mapping?: FieldMapping[]): Record<string, unknown> {
+    if (source === null || source === undefined) {
+      throw new MappingError('Source object cannot be null or undefined', 'source', source);
+    }
+
+    if (!mapping) {
+      // If no mapping provided, shallow clone all enumerable properties
+      return { ...(source as object) } as Record<string, unknown>;
+    }
+
+    const result: Record<string, unknown> = {};
+    const context: MappingContext = { source, targetType: Object as unknown as Constructor<unknown>, data: {} };
+
+    for (const fieldMap of mapping) {
+      this.processFieldMapping(
+        source,
+        result,
+        fieldMap,
+        context,
+        { ...this.DEFAULT_OPTIONS, strictMapping: false },
+        new Map(),
+      );
+    }
+
+    return result;
+  }
+
+  // ============================================================================
+  // Private Helper Methods
+  // ============================================================================
+
+  /**
+   * Processes a single field mapping
+   */
+  private static processFieldMapping(
+    source: unknown,
+    target: Record<string, unknown>,
+    fieldMap: FieldMapping,
+    context: MappingContext,
+    options: Required<MappingOptions>,
+    validationErrors: Map<string, string[]>,
+  ): void {
+    const { from, to = from, transform, defaultValue, optional, validate, skipIfNull } = fieldMap;
+
+    let value = getNestedValue(source, from);
+
+    if (value === null || value === undefined) {
+      if (skipIfNull) {
+        return;
+      }
+
+      if (defaultValue !== undefined) {
+        value = deepClone(defaultValue);
+      } else if (!optional && options.throwOnMissingFields) {
+        throw new MappingError(`Required field '${from}' is missing or null`, from, value);
+      } else if (!options.copyUndefined) {
+        return;
+      }
+    }
+
+    if (transform && value !== undefined) {
+      value = transform(value, source, context);
+    }
+
+    if (validate && value !== undefined) {
+      const validators = Array.isArray(validate) ? validate : [validate];
+
+      for (const validator of validators) {
+        const normalizedValidator = normalizeValidator(validator);
+        const result = normalizedValidator(value, from, context);
+        if (!result.valid && result.errors) {
+          const existingErrors = validationErrors.get(to) || [];
+          validationErrors.set(to, [...existingErrors, ...result.errors]);
+        }
+      }
+    }
+
+    // Strict Mapping: Ensure target property exists
+    if (options.strictMapping && !(to in target)) {
+      throw new MappingError(`Strict mapping failed: Property '${to}' does not exist in target type`, to, value);
+    }
+
+    setNestedValue(target, to, value);
+  }
+
+  /**
+   * Validates mapping configuration at creation time
+   */
+  private static validateMappingConfig(mapping: FieldMapping[]): void {
+    if (!Array.isArray(mapping)) {
+      throw new MappingError('Mapping must be an array', 'mapping', mapping);
+    }
+
+    const seenTargets = new Set<string>();
+
+    for (const fieldMap of mapping) {
+      if (!fieldMap.from || typeof fieldMap.from !== 'string') {
+        throw new MappingError("Invalid mapping: 'from' must be a non-empty string", 'from', fieldMap.from);
+      }
+
+      const targetPath = fieldMap.to || fieldMap.from;
+
+      if (seenTargets.has(targetPath)) {
+        console.warn(
+          `[Objecter] Warning: Duplicate target path '${targetPath}' in mapping. ` +
+            'Later mapping will override earlier one.',
+        );
+      }
+      seenTargets.add(targetPath);
+    }
+  }
+}
+
+export default Objecter;

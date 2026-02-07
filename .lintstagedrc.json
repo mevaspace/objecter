@@ -1,0 +1,4 @@
+{
+  "src/**/*.ts": ["eslint -c eslint.config.mts src"],
+  "*": ["prettier --log-level=silent --write --config .prettierrc.json ."]
+}

@@ -1,0 +1,66 @@
+{
+  "name": "@mevaspace/objecter",
+  "author": "Ivan Azis <ivanazis.id@gmail.com>",
+  "license": "MIT",
+  "version": "0.0.1-dev",
+  "description": "A simple object manipulation library",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "precz": "pnpm prepare",
+    "preinstall": "pnpm dlx only-allow pnpm",
+    "prebuild": "rimraf dist",
+    "build": "tsup src/index.ts --format cjs,esm --dts --minify --clean",
+    "postbuild": "ts-node scripts/copy-package.ts",
+    "test": "pnpm test:unit && pnpm test:e2e",
+    "test:unit": "jest -c jest.unit.config.json",
+    "test:cov": "jest -c jest.unit.config.json --coverage",
+    "pretest:e2e": "pnpm build",
+    "test:e2e": "jest -c jest.e2e.config.json && node test/e2e/wrapper.test.js && node test/e2e/wrapper.test.mjs",
+    "prepare": "husky"
+  },
+  "packageManager": "pnpm@10.26.1",
+  "devDependencies": {
+    "@commitlint/cli": "^20.4.1",
+    "@commitlint/config-conventional": "^20.4.1",
+    "@eslint/js": "^9.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.2.1",
+    "commitizen": "^4.3.1",
+    "commitlint": "^20.4.1",
+    "cz-conventional-changelog": "^3.3.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-unused-imports": "^4.3.0",
+    "globals": "^17.3.0",
+    "husky": "^9.1.7",
+    "jest": "^30.2.0",
+    "jiti": "^2.6.1",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
+    "rimraf": "^6.1.2",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "rootDir": ".",
+    "outDir": "./dist",
+    "incremental": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2024",
+    "types": ["node", "jest"],
+
+    "sourceMap": false,
+    "declaration": true,
+    "declarationMap": false,
+    "emitDecoratorMetadata": false,
+    "experimentalDecorators": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "removeComments": true,
+    "allowJs": true,
+
+    "strict": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false,
+    "strictPropertyInitialization": false
+  },
+  "exclude": ["dist", "node_modules"]
+}

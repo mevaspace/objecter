@@ -44,20 +44,52 @@ export function getNestedValue(obj: unknown, path: string): unknown {
     }
 
     // Handle array index access (e.g., 'items[0].name' or 'items.0.name')
-    const arrayMatch = key.match(/^(\w+)\[(\d+)\]$/);
+    const arrayMatch = new RegExp(/^(\w+)\[(\d+)\]$/).exec(key);
     if (arrayMatch) {
       const [, arrayKey, indexStr] = arrayMatch;
       const arr = (current as Record<string, unknown>)[arrayKey];
       if (!Array.isArray(arr)) {
         return undefined;
       }
-      current = arr[parseInt(indexStr, 10)];
+      current = arr[Number.parseInt(indexStr, 10)];
     } else {
       current = (current as Record<string, unknown>)[key];
     }
   }
 
   return current;
+}
+
+/**
+ * Validates that a key is not a prototype pollution vector
+ */
+function validateSecureKey(key: string, path: string): void {
+  if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+    throw new Error(`Security Error: Forbidden key '${key}' in path '${path}'`);
+  }
+}
+
+/**
+ * Handles array index notation in path and returns the target object
+ */
+function handleArrayPath(current: Record<string, unknown>, key: string, path: string): Record<string, unknown> {
+  const arrayMatch = new RegExp(/^(\w+)\[(\d+)\]$/).exec(key);
+  if (!arrayMatch) {
+    return current;
+  }
+
+  const [, arrayKey, indexStr] = arrayMatch;
+  validateSecureKey(arrayKey, path);
+
+  const index = Number.parseInt(indexStr, 10);
+  if (!current[arrayKey]) {
+    current[arrayKey] = [];
+  }
+  const arr = current[arrayKey] as unknown[];
+  if (!arr[index]) {
+    arr[index] = {};
+  }
+  return arr[index] as Record<string, unknown>;
 }
 
 /**
@@ -71,31 +103,11 @@ export function setNestedValue(obj: Record<string, unknown>, path: string, value
 
   for (let i = 0; i < keys.length - 1; i++) {
     const key = keys[i];
+    validateSecureKey(key, path);
 
-    // Security: Block prototype pollution
-    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
-      throw new Error(`Security Error: Forbidden key '${key}' in path '${path}'`);
-    }
-
-    // Handle array index in path
-    const arrayMatch = key.match(/^(\w+)\[(\d+)\]$/);
+    const arrayMatch = new RegExp(/^(\w+)\[(\d+)\]$/).exec(key);
     if (arrayMatch) {
-      const [, arrayKey, indexStr] = arrayMatch;
-
-      // Security: Block prototype pollution in array key too
-      if (arrayKey === '__proto__' || arrayKey === 'constructor' || arrayKey === 'prototype') {
-        throw new Error(`Security Error: Forbidden key '${arrayKey}' in path '${path}'`);
-      }
-
-      const index = parseInt(indexStr, 10);
-      if (!current[arrayKey]) {
-        current[arrayKey] = [];
-      }
-      const arr = current[arrayKey] as unknown[];
-      if (!arr[index]) {
-        arr[index] = {};
-      }
-      current = arr[index] as Record<string, unknown>;
+      current = handleArrayPath(current, key, path);
     } else {
       if (!current[key] || typeof current[key] !== 'object') {
         current[key] = {};
@@ -104,10 +116,10 @@ export function setNestedValue(obj: Record<string, unknown>, path: string, value
     }
   }
 
-  const finalKey = keys[keys.length - 1];
-  // Security check for final key
-  if (finalKey === '__proto__' || finalKey === 'constructor' || finalKey === 'prototype') {
-    throw new Error(`Security Error: Forbidden key '${finalKey}' in path '${path}'`);
+  const finalKey = keys.at(-1);
+  if (!finalKey) {
+    throw new Error(`Invalid path: empty final key in '${path}'`);
   }
+  validateSecureKey(finalKey, path);
   current[finalKey] = value;
 }

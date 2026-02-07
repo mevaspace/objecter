@@ -26,11 +26,11 @@ export const Transformers = {
   toNumber: (): TransformFn<unknown, number> => (value) => {
     const safeString = typeof value === 'symbol' ? value.toString() : JSON.stringify(value);
     if (value === null || value === undefined || value === '') {
-      throw new Error(`Cannot convert '${safeString}' to number`);
+      throw new TypeError(`Cannot convert '${safeString}' to number`);
     }
     const num = Number(value);
     if (Number.isNaN(num)) {
-      throw new Error(`Cannot convert '${safeString}' to number`);
+      throw new TypeError(`Cannot convert '${safeString}' to number`);
     }
     return num;
   },
@@ -38,7 +38,7 @@ export const Transformers = {
   /**
    * Converts to string
    */
-  toString: (): TransformFn<unknown, string> => (value) => String(value),
+  toString: (): TransformFn<unknown, string> => String,
 
   /**
    * Converts to boolean
@@ -60,7 +60,7 @@ export const Transformers = {
     if (value instanceof Date) return value;
     const date = new Date(value as string | number);
     if (Number.isNaN(date.getTime())) {
-      throw new Error(`Cannot convert '${String(value)}' to Date`);
+      throw new TypeError(`Cannot convert '${String(value)}' to Date`);
     }
     return date;
   },
@@ -71,7 +71,7 @@ export const Transformers = {
   toISOString: (): TransformFn<Date | string | number, string> => (value) => {
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) {
-      throw new Error(`Cannot convert '${String(value)}' to ISO string`);
+      throw new TypeError(`Cannot convert '${String(value)}' to ISO string`);
     }
     return date.toISOString();
   },
@@ -86,7 +86,7 @@ export const Transformers = {
       try {
         return JSON.parse(value) as T;
       } catch {
-        throw new Error(`Invalid JSON: ${value}`);
+        throw new SyntaxError(`Invalid JSON: ${value}`);
       }
     },
 

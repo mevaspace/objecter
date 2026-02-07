@@ -41,7 +41,7 @@ export function normalizeValidator<T>(validator: Validator<T>): ValidateFn<T> {
 
       // If result is boolean (predicate)
       if (typeof result === 'boolean') {
-        return { valid: result, errors: !result ? [`${fieldName} is invalid`] : undefined };
+        return result ? { valid: true } : { valid: false, errors: [`${fieldName} is invalid`] };
       }
 
       // If result is object with 'valid' property (ValidateFn)

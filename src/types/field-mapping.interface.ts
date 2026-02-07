@@ -11,7 +11,7 @@ import type { Validator } from './validator.type';
  * Helper type to get property path - uses NestedKeyOf for known object types,
  * falls back to PropertyPath for unknown/any
  */
-type PropertyPathOf<T> = unknown extends T ? string : T extends object ? NestedKeyOf<T> | (string & {}) : string;
+type PropertyPathOf<T> = unknown extends T ? string : T extends object ? NestedKeyOf<T> | string : string;
 
 export interface FieldMapping<TSource = unknown, TTarget = unknown> {
   /** Source property path (supports nested paths like 'user.name') */

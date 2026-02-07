@@ -73,12 +73,9 @@ export class Objecter {
     const context: MappingContext = { source, targetType: targetClass, data: mergedOptions.context };
 
     const validationErrors = new Map<string, string[]>();
-
-    // Track which target properties have been explicitly mapped
     const mappedTargetProps = new Set<string>();
 
     for (const fieldMap of mapping) {
-      // Track the target property being mapped
       mappedTargetProps.add(fieldMap.to || fieldMap.from);
       try {
         this.processFieldMapping(
@@ -90,74 +87,14 @@ export class Objecter {
           validationErrors,
         );
       } catch (error) {
-        if (error instanceof MappingError) {
-          // Prepend current field to the error path to create full path
-          // Create new error to preserve stack but update message/field
-          const newField = `${fieldMap.from}.${error.field}`;
-          throw new MappingError(
-            error.message.replace(error.field, newField),
-            newField,
-            error.sourceValue,
-            error.errors,
-          );
-        }
-        if (error instanceof ValidationError) {
-          // For ValidationErrors, we might want to context them too, but they are map-based.
-          // Leaving as is for now or could map keys.
-          throw error;
-        }
-
-        throw new MappingError(
-          `Error mapping field '${fieldMap.from}': ${(error as Error).message}`,
-          fieldMap.from,
-          getNestedValue(source, fieldMap.from),
-        );
+        this.wrapMappingError(error, fieldMap, source);
       }
     }
 
-    // AutoMap: automatically copy properties with matching names not explicitly mapped
-    if (mergedOptions.autoMap && isPlainObject(source)) {
-      const targetInstance = target as Record<string, unknown>;
-      const sourceObj = source as Record<string, unknown>;
+    this.applyAutoMapping(source, target as Record<string, unknown>, targetClass, mappedTargetProps, mergedOptions);
 
-      // OPTIMIZATION: Iterate over target keys (schema) instead of source keys (data)
-      // This prevents performance issues when source object is massive but target is small.
-      // We check own properties of the empty target instance and its prototype.
-      const targetKeys = new Set([
-        ...Object.getOwnPropertyNames(targetInstance),
-        ...Object.getOwnPropertyNames(targetClass.prototype),
-      ]);
-
-      for (const key of targetKeys) {
-        // Skip constructor and internal props
-        if (key === 'constructor') continue;
-
-        // Skip if this property was already explicitly mapped
-        if (mappedTargetProps.has(key)) {
-          continue;
-        }
-
-        // Check if source has this property
-        if (Object.prototype.hasOwnProperty.call(sourceObj, key)) {
-          const value = sourceObj[key];
-
-          // Skip undefined values unless copyUndefined is true
-          if (value === undefined && !mergedOptions.copyUndefined) {
-            continue;
-          }
-
-          // Deep clone to prevent mutation
-          targetInstance[key] = deepClone(value);
-        }
-      }
-    }
-
-    // Throw validation errors if any accumulated
-    if (validationErrors.size > 0 && mergedOptions.throwOnValidationError) {
-      const errorMessages = Array.from(validationErrors.entries())
-        .map(([field, errors]) => `${field}: ${errors.join(', ')}`)
-        .join('; ');
-      throw new ValidationError(`Validation failed: ${errorMessages}`, validationErrors);
+    if (mergedOptions.throwOnValidationError) {
+      this.throwValidationErrors(validationErrors);
     }
 
     return target;
@@ -255,7 +192,7 @@ export class Objecter {
 
     return (source: TSource, _parent?: unknown, context?: MappingContext) => {
       const runtimeOptions = { ...options };
-      if (context && context.data) {
+      if (context?.data) {
         runtimeOptions.context = { ...options?.context, ...context.data };
       }
       return this.convert(source, targetClass, mapping, runtimeOptions);
@@ -279,7 +216,7 @@ export class Objecter {
 
     return (sources: TSource[], _parent?: unknown, context?: MappingContext) => {
       const runtimeOptions = { ...options };
-      if (context && context.data) {
+      if (context?.data) {
         runtimeOptions.context = { ...options?.context, ...context.data };
       }
       return this.convertArray(sources, targetClass, mapping, runtimeOptions);
@@ -352,6 +289,126 @@ export class Objecter {
   // ============================================================================
 
   /**
+   * Wraps errors from field mapping with proper context
+   */
+  private static wrapMappingError(error: unknown, fieldMap: FieldMapping, source: unknown): never {
+    if (error instanceof MappingError) {
+      const newField = `${fieldMap.from}.${error.field}`;
+      throw new MappingError(error.message.replace(error.field, newField), newField, error.sourceValue, error.errors);
+    }
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+
+    throw new MappingError(
+      `Error mapping field '${fieldMap.from}': ${(error as Error).message}`,
+      fieldMap.from,
+      getNestedValue(source, fieldMap.from),
+    );
+  }
+
+  /**
+   * Applies AutoMap logic to copy matching properties
+   */
+  private static applyAutoMapping(
+    source: unknown,
+    target: Record<string, unknown>,
+    targetClass: Constructor<unknown>,
+    mappedTargetProps: Set<string>,
+    options: Required<MappingOptions>,
+  ): void {
+    if (!options.autoMap || !isPlainObject(source)) {
+      return;
+    }
+
+    const sourceObj = source;
+    const targetKeys = new Set([
+      ...Object.getOwnPropertyNames(target),
+      ...Object.getOwnPropertyNames(targetClass.prototype),
+    ]);
+
+    for (const key of targetKeys) {
+      if (key === 'constructor') continue;
+      if (mappedTargetProps.has(key)) continue;
+
+      if (Object.hasOwn(sourceObj, key)) {
+        const value = sourceObj[key];
+        if (value === undefined && !options.copyUndefined) continue;
+        target[key] = deepClone(value);
+      }
+    }
+  }
+
+  /**
+   * Throws validation errors if any accumulated
+   */
+  private static throwValidationErrors(validationErrors: Map<string, string[]>): void {
+    if (validationErrors.size === 0) return;
+
+    const errorMessages = Array.from(validationErrors.entries())
+      .map(([field, errors]) => `${field}: ${errors.join(', ')}`)
+      .join('; ');
+    throw new ValidationError(`Validation failed: ${errorMessages}`, validationErrors);
+  }
+
+  /**
+   * Handles missing or null values with defaultValue and optional logic
+   */
+  private static handleMissingValue(
+    value: unknown,
+    fieldMap: FieldMapping,
+    options: Required<MappingOptions>,
+  ): { shouldSkip: boolean; processedValue: unknown } {
+    if (value !== null && value !== undefined) {
+      return { shouldSkip: false, processedValue: value };
+    }
+
+    if (fieldMap.skipIfNull) {
+      return { shouldSkip: true, processedValue: undefined };
+    }
+
+    if (fieldMap.defaultValue !== undefined) {
+      return { shouldSkip: false, processedValue: deepClone(fieldMap.defaultValue) };
+    }
+
+    if (!fieldMap.optional && options.throwOnMissingFields) {
+      throw new MappingError(`Required field '${fieldMap.from}' is missing or null`, fieldMap.from, value);
+    }
+
+    if (!options.copyUndefined) {
+      return { shouldSkip: true, processedValue: undefined };
+    }
+
+    return { shouldSkip: false, processedValue: value };
+  }
+
+  /**
+   * Runs validators on a value and accumulates errors
+   */
+  private static runValidators(
+    value: unknown,
+    fieldMap: FieldMapping,
+    context: MappingContext,
+    validationErrors: Map<string, string[]>,
+  ): void {
+    if (!fieldMap.validate || value === undefined) {
+      return;
+    }
+
+    const validators = Array.isArray(fieldMap.validate) ? fieldMap.validate : [fieldMap.validate];
+    const targetField = fieldMap.to || fieldMap.from;
+
+    for (const validator of validators) {
+      const normalizedValidator = normalizeValidator(validator);
+      const result = normalizedValidator(value, fieldMap.from, context);
+      if (!result.valid && result.errors) {
+        const existingErrors = validationErrors.get(targetField) || [];
+        validationErrors.set(targetField, [...existingErrors, ...result.errors]);
+      }
+    }
+  }
+
+  /**
    * Processes a single field mapping
    */
   private static processFieldMapping(
@@ -362,42 +419,21 @@ export class Objecter {
     options: Required<MappingOptions>,
     validationErrors: Map<string, string[]>,
   ): void {
-    const { from, to = from, transform, defaultValue, optional, validate, skipIfNull } = fieldMap;
+    const { from, to = from, transform } = fieldMap;
 
     let value = getNestedValue(source, from);
 
-    if (value === null || value === undefined) {
-      if (skipIfNull) {
-        return;
-      }
+    const { shouldSkip, processedValue } = this.handleMissingValue(value, fieldMap, options);
+    if (shouldSkip) return;
 
-      if (defaultValue !== undefined) {
-        value = deepClone(defaultValue);
-      } else if (!optional && options.throwOnMissingFields) {
-        throw new MappingError(`Required field '${from}' is missing or null`, from, value);
-      } else if (!options.copyUndefined) {
-        return;
-      }
-    }
+    value = processedValue;
 
     if (transform && value !== undefined) {
       value = transform(value, source, context);
     }
 
-    if (validate && value !== undefined) {
-      const validators = Array.isArray(validate) ? validate : [validate];
+    this.runValidators(value, fieldMap, context, validationErrors);
 
-      for (const validator of validators) {
-        const normalizedValidator = normalizeValidator(validator);
-        const result = normalizedValidator(value, from, context);
-        if (!result.valid && result.errors) {
-          const existingErrors = validationErrors.get(to) || [];
-          validationErrors.set(to, [...existingErrors, ...result.errors]);
-        }
-      }
-    }
-
-    // Strict Mapping: Ensure target property exists
     if (options.strictMapping && !(to in target)) {
       throw new MappingError(`Strict mapping failed: Property '${to}' does not exist in target type`, to, value);
     }

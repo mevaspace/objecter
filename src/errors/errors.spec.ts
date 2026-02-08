@@ -1,4 +1,4 @@
-import { MappingError, ValidationError } from './index';
+import { MappingError, ValidationError, isMappingError, isValidationError } from './index';
 
 describe('MappingError', () => {
   it('should create error with message and field', () => {
@@ -19,6 +19,25 @@ describe('MappingError', () => {
   });
 });
 
+describe('isMappingError', () => {
+  it('should return true for MappingError', () => {
+    const error = new MappingError('Test', 'field', null);
+    expect(isMappingError(error)).toBe(true);
+  });
+
+  it('should return false for regular Error', () => {
+    const error = new Error('Test');
+    expect(isMappingError(error)).toBe(false);
+  });
+
+  it('should return false for non-error values', () => {
+    expect(isMappingError(null)).toBe(false);
+    expect(isMappingError(undefined)).toBe(false);
+    expect(isMappingError('string')).toBe(false);
+    expect(isMappingError({})).toBe(false);
+  });
+});
+
 describe('ValidationError', () => {
   it('should create error with message and errors map', () => {
     const errors = new Map<string, string[]>();
@@ -36,5 +55,24 @@ describe('ValidationError', () => {
   it('should have correct name', () => {
     const error = new ValidationError('Test', new Map());
     expect(error.name).toBe('ValidationError');
+  });
+});
+
+describe('isValidationError', () => {
+  it('should return true for ValidationError', () => {
+    const error = new ValidationError('Test', new Map());
+    expect(isValidationError(error)).toBe(true);
+  });
+
+  it('should return false for regular Error', () => {
+    const error = new Error('Test');
+    expect(isValidationError(error)).toBe(false);
+  });
+
+  it('should return false for non-error values', () => {
+    expect(isValidationError(null)).toBe(false);
+    expect(isValidationError(undefined)).toBe(false);
+    expect(isValidationError('string')).toBe(false);
+    expect(isValidationError({})).toBe(false);
   });
 });

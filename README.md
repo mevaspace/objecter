@@ -76,25 +76,36 @@ console.log(userDto);
 
 ### 2. Validation and Transformation
 
-Use built-in validators and transformers to sanitize and check data during conversion.
+Use built-in validators and transformers to sanitize and check data during conversion. The `validate` property accepts three types of validators:
+
+1. **Predicate function** `(value) => boolean` - simple function that returns true/false
+2. **ValidateFn** `(value, fieldName, context) => { valid: boolean, errors?: string[] }` - detailed validation result
+3. **Zod schema** - any object with `safeParse` method (Zod compatible)
 
 ```typescript
 import { Objecter, Validators, Transformers } from '@mevaspace/objecter';
+import { z } from 'zod'; // Optional: if using Zod
 
 const mapping = [
   {
     from: 'email',
     to: 'email',
-    // Trim whitespace first, then validate it's an email pattern
     transform: Transformers.trim(),
+    // Using built-in validator
     validate: Validators.pattern(/^.+@.+\..+$/),
   },
   {
     from: 'age',
     to: 'age',
-    // Convert string input to number, then validate logic
     transform: Transformers.toNumber(),
-    validate: Validators.custom((age: number) => age >= 18 && age <= 100, 'Must be between 18 and 100'),
+    // Using predicate function
+    validate: (age: number) => age >= 18 && age <= 100,
+  },
+  {
+    from: 'username',
+    to: 'username',
+    // Using Zod schema (if zod is installed)
+    validate: z.string().min(3).max(20),
   },
 ];
 ```
@@ -178,7 +189,89 @@ const dto = Objecter.convert(
 );
 ```
 
-### 6. Merging Objects
+### 6. Conditional Mapping with Predicates
+
+Use `skipIf` to conditionally skip field mapping based on custom logic. This is more flexible than `skipIfNull` as it allows you to define any condition.
+
+```typescript
+import { Objecter, type SkipIfPredicate } from '@mevaspace/objecter';
+
+class UserEntity {
+  name: string;
+  email: string;
+  role: string;
+  internalNotes?: string;
+}
+
+class UserDTO {
+  name: string;
+  email?: string;
+  internalNotes?: string;
+}
+
+// Skip email for admin users
+const skipEmailForAdmin: SkipIfPredicate = (_value, source: any) => {
+  return source.role === 'admin';
+};
+
+// Skip internal notes based on context
+const skipInternalNotes: SkipIfPredicate = (_value, _source, context) => {
+  return context.data?.publicView === true;
+};
+
+const mapping = [
+  { from: 'name', to: 'name' },
+  { from: 'email', to: 'email', skipIf: skipEmailForAdmin },
+  { from: 'internalNotes', to: 'internalNotes', skipIf: skipInternalNotes },
+];
+
+const dto = Objecter.convert(user, UserDTO, mapping, { context: { publicView: true } });
+```
+
+### 7. Schema-Level Validation
+
+Use `validateSchema` option to validate the entire target object after all field mappings are complete. This is useful for business rules that depend on multiple fields.
+
+```typescript
+import { Objecter, type SchemaValidateFn } from '@mevaspace/objecter';
+
+class RegistrationDTO {
+  username: string;
+  password: string;
+  confirmPassword: string;
+  age: number;
+}
+
+// Validate password match and age requirement
+const validateRegistration: SchemaValidateFn = (target: any) => {
+  const errors: string[] = [];
+
+  if (target.password !== target.confirmPassword) {
+    errors.push('Password and confirm password must match');
+  }
+
+  if (target.age < 18) {
+    errors.push('User must be at least 18 years old');
+  }
+
+  return errors.length > 0 ? { valid: false, errors } : { valid: true };
+};
+
+const mapping = [
+  { from: 'username', to: 'username' },
+  { from: 'password', to: 'password' },
+  { from: 'confirmPassword', to: 'confirmPassword' },
+  { from: 'age', to: 'age' },
+];
+
+try {
+  const dto = Objecter.convert(source, RegistrationDTO, mapping, { validateSchema: validateRegistration });
+} catch (error) {
+  // ValidationError: Schema validation failed: Password and confirm password must match
+}
+```
+
+### 8. Merging Objects
 
 Merge multiple source objects into a single target instance. Later sources override earlier ones.
 
@@ -186,7 +279,7 @@ Merge multiple source objects into a single target instance. Later sources overr
 const mergedDto = Objecter.merge([source1, source2], TargetDTO, mapping);
 ```
 
-### 7. Plain Objects
+### 9. Plain Objects
 
 Convert class instances to plain JavaScript objects (stripping prototypes), or simply pick/transform fields from an object.
 
@@ -218,6 +311,7 @@ Configuration object passed to methods as the last argument.
 | `strictMapping`          | `boolean`             | `true`  | Throw an error if mapping targets a non-existent property.               |
 | `autoMap`                | `boolean`             | `false` | Automatically copy properties with matching names not explicitly mapped. |
 | `context`                | `Record<string, any>` | `{}`    | Additional context data accessible in transforms/validators.             |
+| `validateSchema`         | `SchemaValidateFn`    | -       | Schema-level validation function executed after all field mappings.      |
 
 ### Built-in Validators
 

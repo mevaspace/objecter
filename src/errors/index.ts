@@ -1,2 +1,2 @@
-export { MappingError } from './mapping.error';
-export { ValidationError } from './validation.error';
+export { MappingError, isMappingError } from './mapping.error';
+export { ValidationError, isValidationError } from './validation.error';

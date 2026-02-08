@@ -1,3 +1,16 @@
+import type { MappingContext } from './mapping-context.interface';
+import type { ValidationResult } from './validation-result.interface';
+
+/**
+ * Schema validation predicate function
+ * Validates the entire target object after all field mappings are applied
+ * @param target - The mapped target object
+ * @param source - The original source object
+ * @param context - Mapping context
+ * @returns Validation result indicating success or failure with error messages
+ */
+export type SchemaValidateFn = (target: unknown, source: unknown, context: MappingContext) => ValidationResult;
+
 /**
  * Mapping configuration options
  */
@@ -17,4 +30,9 @@ export interface MappingOptions {
    * When enabled, properties present in both source and target will be copied automatically
    */
   autoMap?: boolean;
+  /**
+   * Schema-level validation function executed after all field mappings
+   * Useful for validating business rules that depend on multiple fields
+   */
+  validateSchema?: SchemaValidateFn;
 }

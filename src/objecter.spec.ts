@@ -569,4 +569,189 @@ describe('Objecter', () => {
       expect(() => Objecter.convert(source, Target, mapping)).toThrow(/value not positive/);
     });
   });
+
+  describe('Stress Tests', () => {
+    it('should handle deep nesting (15 levels)', () => {
+      // Create deeply nested source
+      let source: any = { value: 'deep' };
+      for (let i = 0; i < 15; i++) {
+        source = { nested: source };
+      }
+
+      class DeepTarget {
+        value: string = '';
+      }
+
+      const mapping = [
+        {
+          from: 'nested.nested.nested.nested.nested.nested.nested.nested.nested.nested.nested.nested.nested.nested.nested.value',
+          to: 'value',
+        },
+      ];
+
+      const result = Objecter.convert(source, DeepTarget, mapping);
+      expect(result.value).toBe('deep');
+    });
+
+    it('should handle very long property paths', () => {
+      const pathParts = new Array(50).fill('a').join('.');
+      let source: any = { value: 'found' };
+      for (let i = 49; i >= 0; i--) {
+        source = { a: source };
+      }
+
+      class Target {
+        result: string = '';
+      }
+
+      const mapping = [{ from: `${pathParts}.value`, to: 'result' }];
+      const result = Objecter.convert(source, Target, mapping);
+      expect(result.result).toBe('found');
+    });
+
+    it('should handle large arrays efficiently with generator', () => {
+      const largeArray = Array.from({ length: 10000 }, (_, i) => ({ id: i, name: `Item${i}` }));
+
+      class Item {
+        id: number = 0;
+        name: string = '';
+      }
+
+      const mapping = [{ from: 'id' }, { from: 'name' }];
+      const generator = Objecter.convertArrayGenerator(largeArray, Item, mapping);
+
+      const results: Item[] = [];
+      for (const item of generator) {
+        results.push(item);
+        if (results.length >= 100) break;
+      }
+
+      expect(results.length).toBe(100);
+      expect(results[0].id).toBe(0);
+      expect(results[99].id).toBe(99);
+    });
+  });
+
+  describe('AutoMap Edge Cases', () => {
+    it('should skip undefined values when copyUndefined is false', () => {
+      class Target {
+        existing: string = 'default';
+        another: number = 0;
+      }
+
+      const source = { existing: undefined, another: 42 };
+      const result = Objecter.convert(source, Target, [], { autoMap: true, copyUndefined: false });
+
+      expect(result.existing).toBe('default');
+      expect(result.another).toBe(42);
+    });
+
+    it('should copy undefined values when copyUndefined is true', () => {
+      class Target {
+        existing: string = 'default';
+      }
+
+      const source = { existing: undefined };
+      const result = Objecter.convert(source, Target, [], { autoMap: true, copyUndefined: true });
+
+      expect(result.existing).toBeUndefined();
+    });
+
+    it('should not auto-map properties not in source', () => {
+      class Target {
+        a: string = 'default-a';
+        b: string = 'default-b';
+      }
+
+      const source = { a: 'from-source' };
+      const result = Objecter.convert(source, Target, [], { autoMap: true });
+
+      expect(result.a).toBe('from-source');
+      expect(result.b).toBe('default-b');
+    });
+
+    it('should skip constructor property in autoMap', () => {
+      class Target {
+        value: string = '';
+      }
+
+      const source = { value: 'test', constructor: 'malicious' };
+      const result = Objecter.convert(source, Target, [], { autoMap: true });
+
+      expect(result.value).toBe('test');
+      expect(result.constructor).toBe(Target);
+    });
+  });
+
+  describe('Merge Edge Cases', () => {
+    it('should handle null/undefined sources in merge array', () => {
+      class Target {
+        a: number = 0;
+        b: string = '';
+      }
+
+      const result = Objecter.merge([null, { a: 1 }, undefined, { b: 'test' }], Target, [{ from: 'a' }, { from: 'b' }]);
+
+      expect(result.a).toBe(1);
+      expect(result.b).toBe('test');
+    });
+
+    it('should handle primitive values in merge array (ignored)', () => {
+      class Target {
+        a: number = 0;
+      }
+
+      const result = Objecter.merge(['string', 123, { a: 42 }], Target, [{ from: 'a' }]);
+
+      expect(result.a).toBe(42);
+    });
+  });
+
+  describe('Generator Edge Cases', () => {
+    it('should throw for non-array in generator', () => {
+      expect(() => {
+        const gen = Objecter.convertArrayGenerator('not array' as any, TargetClass, []);
+        gen.next();
+      }).toThrow(MappingError);
+    });
+
+    it('should wrap transform errors in MappingError with context', () => {
+      class BadTransform {
+        val: number = 0;
+      }
+
+      const sources = [{ val: 1 }];
+      const mapping = [
+        {
+          from: 'val',
+          transform: () => {
+            throw new TypeError('Custom type error');
+          },
+        },
+      ];
+
+      const gen = Objecter.convertArrayGenerator(sources, BadTransform, mapping);
+      expect(() => gen.next()).toThrow(/Custom type error/);
+    });
+  });
+
+  describe('ConvertArray Edge Cases', () => {
+    it('should wrap transform errors in MappingError with context', () => {
+      class BadTransform {
+        val: number = 0;
+      }
+
+      const sources = [{ val: 1 }];
+      const mapping = [
+        {
+          from: 'val',
+          transform: () => {
+            throw new Error('Custom error');
+          },
+        },
+      ];
+
+      expect(() => Objecter.convertArray(sources, BadTransform, mapping)).toThrow(/Custom error/);
+    });
+  });
 });

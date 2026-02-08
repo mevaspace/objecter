@@ -1,6 +1,16 @@
 import type { NestedKeyOf } from './property-path.type';
 import type { TransformFn } from './transform-fn.type';
 import type { Validator } from './validator.type';
+import type { MappingContext } from './mapping-context.interface';
+
+/**
+ * Predicate function to determine if a field should be skipped
+ * @param value - The value from the source
+ * @param source - The entire source object
+ * @param context - Mapping context
+ * @returns true if the field should be skipped, false otherwise
+ */
+export type SkipIfPredicate = (value: unknown, source: unknown, context: MappingContext) => boolean;
 
 /**
  * Single field mapping configuration
@@ -28,4 +38,6 @@ export interface FieldMapping<TSource = unknown, TTarget = unknown> {
   validate?: Validator | Validator[];
   /** Whether to skip this field if source value is null/undefined */
   skipIfNull?: boolean;
+  /** Predicate function to determine if this field should be skipped */
+  skipIf?: SkipIfPredicate;
 }

@@ -143,3 +143,6 @@ vite.config.ts.timestamp-*
 # IDEs
 .vscode
 .idea
+
+# note files
+REPORT.md

@@ -11,3 +11,12 @@ export class ValidationError extends Error {
     Object.setPrototypeOf(this, ValidationError.prototype);
   }
 }
+
+/**
+ * Type guard for ValidationError
+ * @param error - The error to check
+ * @returns True if the error is a ValidationError
+ */
+export function isValidationError(error: unknown): error is ValidationError {
+  return error instanceof ValidationError;
+}

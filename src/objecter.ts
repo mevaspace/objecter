@@ -1,5 +1,5 @@
 import { MappingError, ValidationError } from './errors';
-import { MappingOptions, Constructor, FieldMapping, MappingContext } from './types';
+import { MappingOptions, Constructor, FieldMapping, MappingContext, SchemaValidateFn } from './types';
 import { getNestedValue, isPlainObject, deepClone, setNestedValue, normalizeValidator } from './utils';
 
 /**
@@ -45,6 +45,7 @@ export class Objecter {
     context: {},
     strictMapping: true,
     autoMap: false,
+    validateSchema: null as unknown as SchemaValidateFn,
   };
 
   /**
@@ -95,6 +96,19 @@ export class Objecter {
 
     if (mergedOptions.throwOnValidationError) {
       this.throwValidationErrors(validationErrors);
+    }
+
+    // Run schema-level validation if provided
+    if (mergedOptions.validateSchema) {
+      const schemaResult = mergedOptions.validateSchema(target, source, context);
+      if (!schemaResult.valid && schemaResult.errors) {
+        if (mergedOptions.throwOnValidationError) {
+          throw new ValidationError(
+            `Schema validation failed: ${schemaResult.errors.join(', ')}`,
+            new Map([['_schema', schemaResult.errors]]),
+          );
+        }
+      }
     }
 
     return target;
@@ -358,11 +372,19 @@ export class Objecter {
     value: unknown,
     fieldMap: FieldMapping,
     options: Required<MappingOptions>,
+    source: unknown,
+    context: MappingContext,
   ): { shouldSkip: boolean; processedValue: unknown } {
+    // Check skipIf predicate first (most flexible)
+    if (fieldMap.skipIf?.(value, source, context)) {
+      return { shouldSkip: true, processedValue: undefined };
+    }
+
     if (value !== null && value !== undefined) {
       return { shouldSkip: false, processedValue: value };
     }
 
+    // Backward compatibility: skipIfNull is shorthand for skipIf((v) => v === null || v === undefined)
     if (fieldMap.skipIfNull) {
       return { shouldSkip: true, processedValue: undefined };
     }
@@ -423,7 +445,7 @@ export class Objecter {
 
     let value = getNestedValue(source, from);
 
-    const { shouldSkip, processedValue } = this.handleMissingValue(value, fieldMap, options);
+    const { shouldSkip, processedValue } = this.handleMissingValue(value, fieldMap, options, source, context);
     if (shouldSkip) return;
 
     value = processedValue;

@@ -117,6 +117,28 @@ export class Objecter {
   }
 
   /**
+   * Maps a source object using a registered profile with async transform support
+   *
+   * @param source - Source object to map
+   * @param profileName - Name of the registered profile
+   * @param options - Optional override options (merged with profile and global options)
+   * @returns Promise of mapped target object
+   * @throws {MappingError} When profile is not found
+   */
+  public static async mapAsync<TTarget>(
+    source: unknown,
+    profileName: string,
+    options?: MappingOptions,
+  ): Promise<TTarget> {
+    const profile = this.profiles.get(profileName);
+    if (!profile) {
+      throw new MappingError(`Profile '${profileName}' not found`, 'profileName', profileName);
+    }
+    const mergedOptions = { ...profile.options, ...options };
+    return this.convertAsync(source, profile.targetClass, profile.mapping, mergedOptions) as Promise<TTarget>;
+  }
+
+  /**
    * Converts a source object to a target class instance using the provided mapping
    *
    * @param source - Source object to convert
@@ -183,6 +205,71 @@ export class Objecter {
   } /* istanbul ignore next */
 
   /**
+   * Converts a source object to a target class instance with async transform support
+   *
+   * @param source - Source object to convert
+   * @param targetClass - Target class constructor
+   * @param mapping - Array of field mappings (transforms may return Promises)
+   * @param options - Optional mapping configuration
+   * @returns Promise of target class instance with mapped values
+   * @throws {MappingError} When a required field is missing
+   * @throws {ValidationError} When validation fails
+   */
+  public static async convertAsync<TSource, TTarget>(
+    source: TSource,
+    targetClass: Constructor<TTarget>,
+    mapping: FieldMapping[],
+    options?: MappingOptions,
+  ): Promise<TTarget> {
+    if (source === null || source === undefined) {
+      throw new MappingError('Source object cannot be null or undefined', 'source', source);
+    }
+
+    const mergedOptions = { ...this.DEFAULT_OPTIONS, ...this.globalOptions, ...options };
+    const target = new targetClass();
+    const context: MappingContext = { source, targetType: targetClass, data: mergedOptions.context };
+
+    const validationErrors = new Map<string, string[]>();
+    const mappedTargetProps = new Set<string>();
+
+    for (const fieldMap of mapping) {
+      mappedTargetProps.add(fieldMap.to || fieldMap.from);
+      try {
+        await this.processFieldMappingAsync(
+          source,
+          target as Record<string, unknown>,
+          fieldMap,
+          context,
+          mergedOptions,
+          validationErrors,
+        );
+      } catch (error) {
+        this.wrapMappingError(error, fieldMap, source);
+      }
+    }
+
+    this.applyAutoMapping(source, target as Record<string, unknown>, targetClass, mappedTargetProps, mergedOptions);
+
+    if (mergedOptions.throwOnValidationError) {
+      this.throwValidationErrors(validationErrors);
+    }
+
+    if (mergedOptions.validateSchema) {
+      const schemaResult = mergedOptions.validateSchema(target, source, context);
+      if (!schemaResult.valid && schemaResult.errors) {
+        if (mergedOptions.throwOnValidationError) {
+          throw new ValidationError(
+            `Schema validation failed: ${schemaResult.errors.join(', ')}`,
+            new Map([['_schema', schemaResult.errors]]),
+          );
+        }
+      }
+    }
+
+    return target;
+  } /* istanbul ignore next */
+
+  /**
    * Converts an array of source objects to target class instances
    *
    * @param sources - Array of source objects
@@ -216,6 +303,46 @@ export class Objecter {
         throw error;
       }
     });
+  }
+
+  /**
+   * Converts an array of source objects to target class instances with async transform support
+   *
+   * @param sources - Array of source objects
+   * @param targetClass - Target class constructor
+   * @param mapping - Array of field mappings (transforms may return Promises)
+   * @param options - Optional mapping configuration
+   * @returns Promise of array of target class instances
+   */
+  public static async convertArrayAsync<TSource, TTarget>(
+    sources: TSource[],
+    targetClass: Constructor<TTarget>,
+    mapping: FieldMapping[],
+    options?: MappingOptions,
+  ): Promise<TTarget[]> {
+    if (!Array.isArray(sources)) {
+      throw new MappingError('Source must be an array', 'sources', sources);
+    }
+
+    const results: TTarget[] = [];
+    for (let index = 0; index < sources.length; index++) {
+      const source = sources[index];
+      try {
+        const result = await this.convertAsync(source, targetClass, mapping, options);
+        results.push(result);
+      } catch (error) {
+        if (error instanceof MappingError) {
+          throw new MappingError(
+            `Error at index ${index}: ${error.message}`,
+            `[${index}].${error.field}`,
+            error.sourceValue,
+            error.errors,
+          );
+        }
+        throw error;
+      }
+    }
+    return results;
   }
 
   /**
@@ -523,6 +650,40 @@ export class Objecter {
 
     if (transform && value !== undefined) {
       value = transform(value, source, context);
+    }
+
+    this.runValidators(value, fieldMap, context, validationErrors);
+
+    if (options.strictMapping && !(to in target)) {
+      throw new MappingError(`Strict mapping failed: Property '${to}' does not exist in target type`, to, value);
+    }
+
+    setNestedValue(target, to, value);
+  }
+
+  /**
+   * Processes a single field mapping with async transform support
+   */
+  private static async processFieldMappingAsync(
+    source: unknown,
+    target: Record<string, unknown>,
+    fieldMap: FieldMapping,
+    context: MappingContext,
+    options: Required<MappingOptions>,
+    validationErrors: Map<string, string[]>,
+  ): Promise<void> {
+    const { from, to = from, transform } = fieldMap;
+
+    let value = getNestedValue(source, from);
+
+    const { shouldSkip, processedValue } = this.handleMissingValue(value, fieldMap, options, source, context);
+    if (shouldSkip) return;
+
+    value = processedValue;
+
+    if (transform && value !== undefined) {
+      const result = transform(value, source, context);
+      value = result instanceof Promise ? await result : result;
     }
 
     this.runValidators(value, fieldMap, context, validationErrors);

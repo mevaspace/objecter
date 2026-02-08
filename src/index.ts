@@ -5,6 +5,7 @@
 export type {
   Constructor,
   TransformFn,
+  AsyncTransformFn,
   ValidateFn,
   ValidationResult,
   MappingContext,

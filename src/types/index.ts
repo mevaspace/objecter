@@ -2,6 +2,7 @@
 export type { Constructor } from './constructor.type';
 
 export type { TransformFn } from './transform-fn.type';
+export type { AsyncTransformFn } from './async-transform-fn.type';
 export type { ValidateFn } from './validate-fn.type';
 export type { Validator } from './validator.type';
 

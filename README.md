@@ -341,6 +341,45 @@ Objecter.clearProfiles();
 
 > **Note**: If the profile name is not found, `Objecter.map()` throws a `MappingError`.
 
+### 12. Async Transform
+
+Use async methods when your transform functions need to perform async operations (API calls, database lookups, file I/O).
+
+```typescript
+import { Objecter, FieldMapping } from '@mevaspace/objecter';
+
+class UserWithRole {
+  id: number;
+  name: string;
+  role: string;
+}
+
+// Async transform untuk API call
+const fetchRole = async (userId: number): Promise<string> => {
+  const response = await fetch(`/api/roles/${userId}`);
+  const data = await response.json();
+  return data.role;
+};
+
+const mapping: FieldMapping[] = [
+  { from: 'id', to: 'id' },
+  { from: 'name', to: 'name' },
+  { from: 'id', to: 'role', transform: fetchRole },
+];
+
+// Single object conversion
+const user = await Objecter.convertAsync(source, UserWithRole, mapping);
+
+// Array conversion
+const users = await Objecter.convertArrayAsync(sources, UserWithRole, mapping);
+
+// Profile-based async mapping
+Objecter.registerProfile({ name: 'UserWithRole', targetClass: UserWithRole, mapping });
+const result = await Objecter.mapAsync<UserWithRole>(source, 'UserWithRole');
+```
+
+> **Note**: Async methods (`convertAsync`, `convertArrayAsync`, `mapAsync`) can handle both sync and async transforms. Use them when at least one of your transforms returns a Promise.
+
 ## API Overview
 
 ### Core Methods
@@ -357,6 +396,9 @@ Objecter.clearProfiles();
 - `Objecter.registerProfile(profile)`: Register a reusable mapping profile.
 - `Objecter.map(source, profileName, options?)`: Convert using a registered profile.
 - `Objecter.clearProfiles()`: Clear all registered profiles.
+- `Objecter.convertAsync(source, TargetClass, mapping, options?)`: Async version - for async transforms.
+- `Objecter.convertArrayAsync(sourceArray, TargetClass, mapping, options?)`: Async array conversion.
+- `Objecter.mapAsync(source, profileName, options?)`: Async profile-based mapping.
 
 ### Mapping Options
 

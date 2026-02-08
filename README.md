@@ -378,6 +378,35 @@ Objecter.registerProfile({ name: 'UserWithRole', targetClass: UserWithRole, mapp
 const result = await Objecter.mapAsync<UserWithRole>(source, 'UserWithRole');
 ```
 
+### 13. Async Validation
+
+Similar to async transforms, you can use async validators for checks that require database or API calls.
+
+```typescript
+// Field-level async validation
+const mapping = [
+  {
+    from: 'username',
+    to: 'username',
+    validateAsync: async (username: string) => {
+      const isTaken = await db.checkUsername(username);
+      return isTaken ? { valid: false, errors: ['Username taken'] } : { valid: true };
+    },
+  },
+];
+
+// Schema-level async validation
+const validateSchemaAsync: AsyncSchemaValidateFn = async (target, source) => {
+  const isBlacklisted = await db.checkBlacklist(target.email);
+  if (isBlacklisted) return { valid: false, errors: ['Email is blacklisted'] };
+  return { valid: true };
+};
+
+const user = await Objecter.convertAsync(source, UserDto, mapping, { validateSchemaAsync });
+```
+
+> **Note**: `validateAsync` and `validateSchemaAsync` are **only** executed when using async methods (`convertAsync`, etc.). They are ignored by synchronous methods.
+
 > **Note**: Async methods (`convertAsync`, `convertArrayAsync`, `mapAsync`) can handle both sync and async transforms. Use them when at least one of your transforms returns a Promise.
 
 ## API Overview

@@ -1,6 +1,6 @@
 import type { NestedKeyOf } from './property-path.type';
 import type { TransformFn } from './transform-fn.type';
-import type { Validator } from './validator.type';
+import type { Validator, AsyncValidator } from './validator.type';
 import type { MappingContext } from './mapping-context.interface';
 
 /**
@@ -34,8 +34,10 @@ export interface FieldMapping<TSource = unknown, TTarget = unknown> {
   defaultValue?: TTarget;
   /** Whether this field is optional (won't throw if missing) */
   optional?: boolean;
-  /** Validation function(s) for the field */
+  /** Validation function(s) for the field (sync) */
   validate?: Validator | Validator[];
+  /** Async validation function(s) for the field (only runs in async methods) */
+  validateAsync?: AsyncValidator | AsyncValidator[];
   /** Whether to skip this field if source value is null/undefined */
   skipIfNull?: boolean;
   /** Predicate function to determine if this field should be skipped */

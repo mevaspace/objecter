@@ -10,3 +10,12 @@ export type Validator<T = any> =
   | ValidateFn<T>
   | ((value: T) => boolean)
   | { safeParse: (data: unknown) => { success: boolean; error?: { errors: { message: string }[] } } };
+
+/**
+ * Async validator type which can be:
+ * 1. An AsyncValidateFn (returns Promise<ValidationResult>)
+ * 2. An async predicate function (returns Promise<boolean>)
+ */
+export type AsyncValidator<T = any> =
+  | ((value: T, fieldName: string, context?: unknown) => Promise<{ valid: boolean; errors?: string[] }>)
+  | ((value: T) => Promise<boolean>);

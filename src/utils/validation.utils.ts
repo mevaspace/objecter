@@ -1,4 +1,4 @@
-import { ValidateFn, Validator, ValidationResult } from '../types';
+import { ValidateFn, Validator, ValidationResult, AsyncValidator } from '../types';
 
 /**
  * Normalizes a validator into a standardized ValidateFn
@@ -55,4 +55,34 @@ export function normalizeValidator<T>(validator: Validator<T>): ValidateFn<T> {
 
     return { valid: true };
   };
+}
+
+/**
+ * Normalizes an async validator into a standardized async function
+ * Handles both async ValidateFn (returns Promise<ValidationResult>) and async predicates (returns Promise<boolean>)
+ */
+export async function normalizeAsyncValidator<T>(
+  validator: AsyncValidator<T>,
+  value: T,
+  fieldName: string,
+  context?: unknown,
+): Promise<ValidationResult> {
+  if (typeof validator !== 'function') {
+    return { valid: true };
+  }
+
+  const result = await (validator as (...args: unknown[]) => Promise<unknown>)(value, fieldName, context);
+
+  // If result is boolean (async predicate)
+  if (typeof result === 'boolean') {
+    return result ? { valid: true } : { valid: false, errors: [`${fieldName} is invalid`] };
+  }
+
+  // If result is object with 'valid' property (AsyncValidateFn)
+  if (typeof result === 'object' && result !== null && 'valid' in result) {
+    return result as ValidationResult;
+  }
+
+  // Fallback if weird return type
+  return { valid: false, errors: [`${fieldName}: Async validator returned invalid result type`] };
 }

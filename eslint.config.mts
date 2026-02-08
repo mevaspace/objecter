@@ -24,7 +24,7 @@ export default defineConfig([
     settings: { 'import/resolver': { typescript: { project: './tsconfig.json' } } },
   },
   {
-    files: ['**/*.ts'],
+    files: ['**/*.ts', '**/*.spec.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
@@ -40,6 +40,10 @@ export default defineConfig([
       'unused-imports/no-unused-vars': [
         'warn',
         { vars: 'all', varsIgnorePattern: '^_', args: 'after-used', argsIgnorePattern: '^_' },
+      ],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],
     },
   },

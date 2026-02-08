@@ -12,6 +12,20 @@ import type { ValidationResult } from './validation-result.interface';
 export type SchemaValidateFn = (target: unknown, source: unknown, context: MappingContext) => ValidationResult;
 
 /**
+ * Async schema validation function
+ * Validates the entire target object after all field mappings are applied (async version)
+ * @param target - The mapped target object
+ * @param source - The original source object
+ * @param context - Mapping context
+ * @returns Promise of validation result
+ */
+export type AsyncSchemaValidateFn = (
+  target: unknown,
+  source: unknown,
+  context: MappingContext,
+) => Promise<ValidationResult>;
+
+/**
  * Mapping configuration options
  */
 export interface MappingOptions {
@@ -35,4 +49,9 @@ export interface MappingOptions {
    * Useful for validating business rules that depend on multiple fields
    */
   validateSchema?: SchemaValidateFn;
+  /**
+   * Async schema-level validation function (only runs in async methods)
+   * Useful for validations that require async operations like database lookups
+   */
+  validateSchemaAsync?: AsyncSchemaValidateFn;
 }

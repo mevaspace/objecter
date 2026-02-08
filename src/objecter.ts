@@ -1,6 +1,21 @@
 import { MappingError, ValidationError } from './errors';
-import { MappingOptions, Constructor, FieldMapping, MappingContext, SchemaValidateFn, MappingProfile } from './types';
-import { getNestedValue, isPlainObject, deepClone, setNestedValue, normalizeValidator } from './utils';
+import {
+  MappingOptions,
+  Constructor,
+  FieldMapping,
+  MappingContext,
+  SchemaValidateFn,
+  AsyncSchemaValidateFn,
+  MappingProfile,
+} from './types';
+import {
+  getNestedValue,
+  isPlainObject,
+  deepClone,
+  setNestedValue,
+  normalizeValidator,
+  normalizeAsyncValidator,
+} from './utils';
 
 /**
  * Objecter - A lightweight object mapping library for TypeScript
@@ -46,6 +61,7 @@ export class Objecter {
     strictMapping: true,
     autoMap: false,
     validateSchema: null as unknown as SchemaValidateFn,
+    validateSchemaAsync: null as unknown as AsyncSchemaValidateFn,
   };
 
   /**
@@ -190,15 +206,10 @@ export class Objecter {
 
     // Run schema-level validation if provided
     if (mergedOptions.validateSchema) {
-      const schemaResult = mergedOptions.validateSchema(target, source, context);
-      if (!schemaResult.valid && schemaResult.errors) {
-        if (mergedOptions.throwOnValidationError) {
-          throw new ValidationError(
-            `Schema validation failed: ${schemaResult.errors.join(', ')}`,
-            new Map([['_schema', schemaResult.errors]]),
-          );
-        }
-      }
+      this.processSchemaValidationResult(
+        mergedOptions.validateSchema(target, source, context),
+        mergedOptions.throwOnValidationError,
+      );
     }
 
     return target;
@@ -255,15 +266,17 @@ export class Objecter {
     }
 
     if (mergedOptions.validateSchema) {
-      const schemaResult = mergedOptions.validateSchema(target, source, context);
-      if (!schemaResult.valid && schemaResult.errors) {
-        if (mergedOptions.throwOnValidationError) {
-          throw new ValidationError(
-            `Schema validation failed: ${schemaResult.errors.join(', ')}`,
-            new Map([['_schema', schemaResult.errors]]),
-          );
-        }
-      }
+      this.processSchemaValidationResult(
+        mergedOptions.validateSchema(target, source, context),
+        mergedOptions.throwOnValidationError,
+      );
+    }
+
+    if (mergedOptions.validateSchemaAsync) {
+      this.processSchemaValidationResult(
+        await mergedOptions.validateSchemaAsync(target, source, context),
+        mergedOptions.throwOnValidationError,
+      );
     }
 
     return target;
@@ -492,6 +505,21 @@ export class Objecter {
   // ============================================================================
 
   /**
+   * Processes schema validation result and throws error if needed
+   */
+  private static processSchemaValidationResult(
+    result: { valid: boolean; errors?: string[] },
+    throwOnError: boolean,
+  ): void {
+    if (!result.valid && result.errors && throwOnError) {
+      throw new ValidationError(
+        `Schema validation failed: ${result.errors.join(', ')}`,
+        new Map([['_schema', result.errors]]),
+      );
+    }
+  }
+
+  /**
    * Wraps errors from field mapping with proper context
    */
   private static wrapMappingError(error: unknown, fieldMap: FieldMapping, source: unknown): never {
@@ -629,6 +657,40 @@ export class Objecter {
   }
 
   /**
+   * Runs validators asynchronously on a value and accumulates errors
+   */
+  private static async runValidatorsAsync(
+    value: unknown,
+    fieldMap: FieldMapping,
+    context: MappingContext,
+    validationErrors: Map<string, string[]>,
+  ): Promise<void> {
+    if (value === undefined) {
+      return;
+    }
+
+    const targetField = fieldMap.to || fieldMap.from;
+
+    // Run sync validators first
+    if (fieldMap.validate) {
+      this.runValidators(value, fieldMap, context, validationErrors);
+    }
+
+    // Run async validators
+    if (fieldMap.validateAsync) {
+      const validators = Array.isArray(fieldMap.validateAsync) ? fieldMap.validateAsync : [fieldMap.validateAsync];
+
+      for (const validator of validators) {
+        const result = await normalizeAsyncValidator(validator, value, fieldMap.from, context);
+        if (!result.valid && result.errors) {
+          const existingErrors = validationErrors.get(targetField) || [];
+          validationErrors.set(targetField, [...existingErrors, ...result.errors]);
+        }
+      }
+    }
+  }
+
+  /**
    * Processes a single field mapping
    */
   private static processFieldMapping(
@@ -686,7 +748,7 @@ export class Objecter {
       value = result instanceof Promise ? await result : result;
     }
 
-    this.runValidators(value, fieldMap, context, validationErrors);
+    await this.runValidatorsAsync(value, fieldMap, context, validationErrors);
 
     if (options.strictMapping && !(to in target)) {
       throw new MappingError(`Strict mapping failed: Property '${to}' does not exist in target type`, to, value);

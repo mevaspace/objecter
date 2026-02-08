@@ -20,6 +20,7 @@ const ALLOWED_KEYS = [
   'keywords',
   'bugs',
   'homepage',
+  'publishConfig',
 ];
 
 function adjustPath(p: string): string {
@@ -71,6 +72,16 @@ function run() {
 
     fs.writeFileSync(targetPath, JSON.stringify(newPackageJson, null, 2));
     console.warn(`Copied package.json to ${targetPath}`);
+
+    const filesToCopy = ['README.md', 'CHANGELOG.md'];
+    for (const file of filesToCopy) {
+      const src = path.resolve(process.cwd(), file);
+      const dest = path.resolve(process.cwd(), 'dist', file);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, dest);
+        console.warn(`Copied ${file} to dist/`);
+      }
+    }
   } catch (error) {
     console.warn('Error copying package.json:', error);
     process.exit(1);

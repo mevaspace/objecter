@@ -3,12 +3,13 @@ import { MappingError, ValidationError } from './errors';
 import { Validators } from './validators';
 import { Transformers } from './transformers';
 import { Validator } from './types/validator.type';
+import { SkipIfPredicate, SchemaValidateFn } from './types';
 
 class SourceClass {
   id: number = 0;
   name: string = '';
   email: string = '';
-  password: string = '';
+  age: number = 0;
 }
 
 class TargetClass {
@@ -30,7 +31,7 @@ class UserWithAddress {
 describe('Objecter', () => {
   describe('convert', () => {
     it('should convert basic fields', () => {
-      const source = { id: 1, name: 'John', email: 'john@example.com', password: 'secret' };
+      const source = { id: 1, name: 'John', email: 'john@example.com', age: 30 };
       const mapping = [
         { from: 'id', to: 'id' },
         { from: 'name', to: 'name' },
@@ -140,7 +141,7 @@ describe('Objecter', () => {
       const mapping = [
         { from: 'id', to: 'id' },
         { from: 'name', to: 'name' },
-        { from: 'email', to: 'email', validate: Validators.pattern(/^.+@.+\..+$/) },
+        { from: 'email', to: 'email', validate: Validators.pattern(/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/) },
       ];
 
       expect(() => Objecter.convert(source, TargetClass, mapping)).toThrow(ValidationError);
@@ -151,7 +152,7 @@ describe('Objecter', () => {
       const mapping = [
         { from: 'id', to: 'id' },
         { from: 'name', to: 'name' },
-        { from: 'email', to: 'email', validate: Validators.pattern(/^.+@.+\..+$/) },
+        { from: 'email', to: 'email', validate: Validators.pattern(/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/) },
       ];
 
       const result = Objecter.convert(source, TargetClass, mapping);
@@ -266,7 +267,7 @@ describe('Objecter', () => {
 
       const mapper = Objecter.createMapper<SourceClass, TargetClass>(TargetClass, mapping);
 
-      const source = { id: 1, name: 'John', email: 'john@example.com', password: 'secret' };
+      const source = { id: 1, name: 'John', email: 'john@example.com', age: 30 };
       const result = mapper(source);
 
       expect(result).toBeInstanceOf(TargetClass);
@@ -301,8 +302,8 @@ describe('Objecter', () => {
       const mapper = Objecter.createArrayMapper<SourceClass, TargetClass>(TargetClass, mapping);
 
       const sources = [
-        { id: 1, name: 'John', email: 'john@example.com', password: 'secret' },
-        { id: 2, name: 'Jane', email: 'jane@example.com', password: 'secret' },
+        { id: 1, name: 'John', email: 'john@example.com', age: 30 },
+        { id: 2, name: 'Jane', email: 'jane@example.com', age: 25 },
       ];
       const results = mapper(sources);
 
@@ -370,7 +371,7 @@ describe('Objecter', () => {
 
       const result = Objecter.toPlainObject(source);
 
-      expect(result).toEqual({ id: 1, name: 'John', email: '', password: '' });
+      expect(result).toEqual({ id: 1, name: 'John', email: '', age: 0 });
     });
 
     it('should convert with mapping', () => {
@@ -752,6 +753,183 @@ describe('Objecter', () => {
       ];
 
       expect(() => Objecter.convertArray(sources, BadTransform, mapping)).toThrow(/Custom error/);
+    });
+    describe('Conditional Mapping & Schema Validation', () => {
+      class ConditionalTarget {
+        name?: string;
+        age?: number;
+        email?: string;
+        status?: string;
+        fieldA?: string;
+        fieldB?: string;
+      }
+
+      const validateFieldsMatch: SchemaValidateFn = (target: any) => {
+        if (target.fieldA !== target.fieldB) {
+          return { valid: false, errors: ['Fields must match'] };
+        }
+        return { valid: true };
+      };
+
+      const validateAge: SchemaValidateFn = (target: any) => {
+        if (target.age !== undefined && target.age < 18) {
+          return { valid: false, errors: ['User must be at least 18 years old'] };
+        }
+        return { valid: true };
+      };
+
+      it('should skip field when skipIf predicate returns true', () => {
+        const source = { name: 'John', age: 0, email: 'test@example.com' };
+        const skipIfZero: SkipIfPredicate = (value: any) => value === 0;
+
+        const mapping = [
+          { from: 'name', to: 'name' },
+          { from: 'age', to: 'age', skipIf: skipIfZero },
+          { from: 'email', to: 'email' },
+        ];
+
+        const result = Objecter.convert(source, ConditionalTarget, mapping);
+        expect(result.name).toBe('John');
+        expect(result.age).toBeUndefined();
+        expect(result.email).toBe('test@example.com');
+      });
+
+      it('should skip field based on source object context', () => {
+        const source = { name: 'Admin', age: 30, email: 'admin@example.com', status: 'admin' };
+        const skipIfAdmin: SkipIfPredicate = (_value, src: any) => src.status === 'admin';
+
+        const mapping = [
+          { from: 'name', to: 'name' },
+          { from: 'age', to: 'age' },
+          { from: 'email', to: 'email', skipIf: skipIfAdmin },
+        ];
+
+        const result = Objecter.convert(source, ConditionalTarget, mapping);
+        expect(result.email).toBeUndefined();
+      });
+
+      it('should skip field based on mapping context', () => {
+        const source = { name: 'User', age: 25, email: 'user@example.com' };
+        const skipIfHideEmail: SkipIfPredicate = (_value, _source, context) => {
+          return context.data?.hideEmail === true;
+        };
+
+        const mapping = [
+          { from: 'name', to: 'name' },
+          { from: 'age', to: 'age' },
+          { from: 'email', to: 'email', skipIf: skipIfHideEmail },
+        ];
+
+        const result = Objecter.convert(source, ConditionalTarget, mapping, { context: { hideEmail: true } });
+        expect(result.email).toBeUndefined();
+      });
+
+      it('should maintain backward compatibility with skipIfNull', () => {
+        const source = { name: 'John', age: null, email: 'test@example.com' };
+        const mapping = [
+          { from: 'name', to: 'name' },
+          { from: 'age', to: 'age', skipIfNull: true },
+          { from: 'email', to: 'email' },
+        ];
+
+        const result = Objecter.convert(source, ConditionalTarget, mapping);
+        expect(result.age).toBeUndefined();
+      });
+
+      it('should prioritize skipIf over skipIfNull', () => {
+        const source = { name: 'John', age: 0, email: 'test@example.com' };
+        const skipIfZero: SkipIfPredicate = (value: any) => value === 0;
+
+        const mapping = [
+          { from: 'name', to: 'name' },
+          { from: 'age', to: 'age', skipIf: skipIfZero, skipIfNull: true },
+          { from: 'email', to: 'email' },
+        ];
+
+        const result = Objecter.convert(source, ConditionalTarget, mapping);
+        expect(result.age).toBeUndefined();
+      });
+
+      it('should validate schema after all field mappings', () => {
+        const source = { name: 'John', age: 17 };
+
+        const mapping = [
+          { from: 'name', to: 'name' },
+          { from: 'age', to: 'age' },
+        ];
+
+        expect(() => {
+          Objecter.convert(source, ConditionalTarget, mapping, { validateSchema: validateAge });
+        }).toThrow(ValidationError);
+
+        expect(() => {
+          Objecter.convert(source, ConditionalTarget, mapping, { validateSchema: validateAge });
+        }).toThrow('Schema validation failed: User must be at least 18 years old');
+      });
+
+      it('should validate multiple fields together', () => {
+        const source = { fieldA: 'abc', fieldB: 'def' };
+
+        const mapping = [
+          { from: 'fieldA', to: 'fieldA' },
+          { from: 'fieldB', to: 'fieldB' },
+        ];
+
+        expect(() => {
+          Objecter.convert(source, ConditionalTarget, mapping, { validateSchema: validateFieldsMatch });
+        }).toThrow(ValidationError);
+      });
+
+      it('should pass schema validation when valid', () => {
+        const source = { fieldA: 'abc', fieldB: 'abc' };
+
+        const mapping = [
+          { from: 'fieldA', to: 'fieldA' },
+          { from: 'fieldB', to: 'fieldB' },
+        ];
+
+        const result = Objecter.convert(source, ConditionalTarget, mapping, { validateSchema: validateFieldsMatch });
+        expect(result.fieldA).toBe('abc');
+        expect(result.fieldB).toBe('abc');
+      });
+
+      it('should access source object and mapping context in schema validation', () => {
+        const source = { age: 25 };
+        const validateSourceAge: SchemaValidateFn = (_target, src: any, ctx) => {
+          if ((src.age !== undefined && src.age < 18) || ctx.data?.strictMode === true) {
+            return { valid: false, errors: ['Validation failed'] };
+          }
+          return { valid: true };
+        };
+
+        const mapping = [{ from: 'age', to: 'age' }];
+
+        // Case 1: Source validation
+        const invalidSource = { age: 10 };
+        expect(() =>
+          Objecter.convert(invalidSource, ConditionalTarget, mapping, { validateSchema: validateSourceAge }),
+        ).toThrow(/Validation failed/);
+
+        // Case 2: Context validation
+        expect(() =>
+          Objecter.convert(source, ConditionalTarget, mapping, {
+            validateSchema: validateSourceAge,
+            context: { strictMode: true },
+          }),
+        ).toThrow(/Validation failed/);
+      });
+
+      it('should not throw when throwOnValidationError is false', () => {
+        const source = { age: 17 };
+
+        const mapping = [{ from: 'age', to: 'age' }];
+        const result = Objecter.convert(source, ConditionalTarget, mapping, {
+          validateSchema: validateAge,
+          throwOnValidationError: false,
+        });
+
+        expect(result.age).toBe(17);
+      });
     });
   });
 });

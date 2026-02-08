@@ -174,13 +174,11 @@ export class Objecter {
     if (source === null || source === undefined) {
       throw new MappingError('Source object cannot be null or undefined', 'source', source);
     }
-
-    const mergedOptions = { ...this.DEFAULT_OPTIONS, ...this.globalOptions, ...options };
-    const target = new targetClass();
-    const context: MappingContext = { source, targetType: targetClass, data: mergedOptions.context };
-
-    const validationErrors = new Map<string, string[]>();
-    const mappedTargetProps = new Set<string>();
+    const { mergedOptions, target, context, validationErrors, mappedTargetProps } = this.initializeConversion(
+      source,
+      targetClass,
+      options,
+    );
 
     for (const fieldMap of mapping) {
       mappedTargetProps.add(fieldMap.to || fieldMap.from);
@@ -198,11 +196,7 @@ export class Objecter {
       }
     }
 
-    this.applyAutoMapping(source, target as Record<string, unknown>, targetClass, mappedTargetProps, mergedOptions);
-
-    if (mergedOptions.throwOnValidationError) {
-      this.throwValidationErrors(validationErrors);
-    }
+    this.finalizeConversion(source, target, targetClass, mappedTargetProps, mergedOptions, validationErrors);
 
     // Run schema-level validation if provided
     if (mergedOptions.validateSchema) {
@@ -235,13 +229,11 @@ export class Objecter {
     if (source === null || source === undefined) {
       throw new MappingError('Source object cannot be null or undefined', 'source', source);
     }
-
-    const mergedOptions = { ...this.DEFAULT_OPTIONS, ...this.globalOptions, ...options };
-    const target = new targetClass();
-    const context: MappingContext = { source, targetType: targetClass, data: mergedOptions.context };
-
-    const validationErrors = new Map<string, string[]>();
-    const mappedTargetProps = new Set<string>();
+    const { mergedOptions, target, context, validationErrors, mappedTargetProps } = this.initializeConversion(
+      source,
+      targetClass,
+      options,
+    );
 
     for (const fieldMap of mapping) {
       mappedTargetProps.add(fieldMap.to || fieldMap.from);
@@ -259,11 +251,7 @@ export class Objecter {
       }
     }
 
-    this.applyAutoMapping(source, target as Record<string, unknown>, targetClass, mappedTargetProps, mergedOptions);
-
-    if (mergedOptions.throwOnValidationError) {
-      this.throwValidationErrors(validationErrors);
-    }
+    this.finalizeConversion(source, target, targetClass, mappedTargetProps, mergedOptions, validationErrors);
 
     if (mergedOptions.validateSchema) {
       this.processSchemaValidationResult(
@@ -503,6 +491,41 @@ export class Objecter {
   // ============================================================================
   // Private Helper Methods
   // ============================================================================
+
+  /**
+   * Initializes the conversion context and variables
+   */
+  private static initializeConversion<TSource, TTarget>(
+    source: TSource,
+    targetClass: Constructor<TTarget>,
+    options?: MappingOptions,
+  ) {
+    const mergedOptions = { ...this.DEFAULT_OPTIONS, ...this.globalOptions, ...options };
+    const target = new targetClass();
+    const context: MappingContext = { source, targetType: targetClass, data: mergedOptions.context };
+    const validationErrors = new Map<string, string[]>();
+    const mappedTargetProps = new Set<string>();
+
+    return { mergedOptions, target, context, validationErrors, mappedTargetProps };
+  }
+
+  /**
+   * Finalizes the conversion by applying auto-mapping and throwing collected validation errors
+   */
+  private static finalizeConversion<TTarget>(
+    source: unknown,
+    target: TTarget,
+    targetClass: Constructor<any>,
+    mappedTargetProps: Set<string>,
+    mergedOptions: Required<MappingOptions>,
+    validationErrors: Map<string, string[]>,
+  ) {
+    this.applyAutoMapping(source, target as Record<string, unknown>, targetClass, mappedTargetProps, mergedOptions);
+
+    if (mergedOptions.throwOnValidationError) {
+      this.throwValidationErrors(validationErrors);
+    }
+  }
 
   /**
    * Processes schema validation result and throws error if needed

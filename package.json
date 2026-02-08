@@ -2,7 +2,7 @@
   "name": "@mevaspace/objecter",
   "author": "Ivan Azis <ivanazis.id@gmail.com>",
   "license": "MIT",
-  "version": "0.0.1-dev",
+  "version": "1.0.0",
   "description": "A simple object manipulation library",
   "repository": {
     "type": "git",

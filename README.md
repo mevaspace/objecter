@@ -287,6 +287,60 @@ Convert class instances to plain JavaScript objects (stripping prototypes), or s
 const plainObj = Objecter.toPlainObject(userEntity, mapping);
 ```
 
+### 10. Global Configuration
+
+Set default options that apply to all conversions globally. Useful for reducing boilerplate.
+
+```typescript
+import { Objecter } from '@mevaspace/objecter';
+
+// Set global defaults
+Objecter.configure({ autoMap: true, throwOnValidationError: false });
+
+// All subsequent conversions use these defaults
+const dto1 = Objecter.convert(source1, TargetDTO, mapping);
+const dto2 = Objecter.convert(source2, TargetDTO, mapping);
+
+// Per-call options still override global config
+const dto3 = Objecter.convert(source3, TargetDTO, mapping, { autoMap: false });
+
+// Reset to library defaults
+Objecter.resetConfig();
+```
+
+### 11. Mapping Profiles
+
+Register reusable mapping definitions by name. Profiles are validated at registration time.
+
+```typescript
+import { Objecter, type MappingProfile } from '@mevaspace/objecter';
+
+// Register a profile
+const userProfile = Objecter.registerProfile({
+  name: 'UserToDto',
+  targetClass: UserDTO,
+  mapping: [
+    { from: 'id', to: 'id' },
+    { from: 'name', to: 'name' },
+  ],
+  options: { autoMap: true },
+});
+
+// Use by profile name
+const dto = Objecter.map<UserDTO>(user, 'UserToDto');
+
+// Type-safe name usage (using returned profile)
+const dto2 = Objecter.map<UserDTO>(user, userProfile.name);
+
+// Override profile options per-call
+const dto3 = Objecter.map<UserDTO>(user, 'UserToDto', { autoMap: false });
+
+// Clear all registered profiles
+Objecter.clearProfiles();
+```
+
+> **Note**: If the profile name is not found, `Objecter.map()` throws a `MappingError`.
+
 ## API Overview
 
 ### Core Methods
@@ -298,6 +352,11 @@ const plainObj = Objecter.toPlainObject(userEntity, mapping);
 - `Objecter.createArrayMapper(TargetClass, mapping, options?)`: Create a reusable array mapping function.
 - `Objecter.merge(sources, TargetClass, mapping, options?)`: Merge multiple objects into one target.
 - `Objecter.toPlainObject(source, mapping?)`: Convert an instance to a plain JavaScript object.
+- `Objecter.configure(options)`: Set global default options for all conversions.
+- `Objecter.resetConfig()`: Reset global options to library defaults.
+- `Objecter.registerProfile(profile)`: Register a reusable mapping profile.
+- `Objecter.map(source, profileName, options?)`: Convert using a registered profile.
+- `Objecter.clearProfiles()`: Clear all registered profiles.
 
 ### Mapping Options
 

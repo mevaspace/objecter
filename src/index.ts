@@ -10,6 +10,7 @@ export type {
   MappingContext,
   FieldMapping,
   MappingOptions,
+  MappingProfile,
 } from './types';
 
 // Export main class and error classes

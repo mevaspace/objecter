@@ -10,3 +10,4 @@ export type { ValidationResult } from './validation-result.interface';
 export type { MappingContext } from './mapping-context.interface';
 export type { FieldMapping, SkipIfPredicate } from './field-mapping.interface';
 export type { MappingOptions, SchemaValidateFn } from './mapping-options.interface';
+export type { MappingProfile } from './profile.interface';

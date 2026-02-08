@@ -1,5 +1,5 @@
 import { MappingError, ValidationError } from './errors';
-import { MappingOptions, Constructor, FieldMapping, MappingContext, SchemaValidateFn } from './types';
+import { MappingOptions, Constructor, FieldMapping, MappingContext, SchemaValidateFn, MappingProfile } from './types';
 import { getNestedValue, isPlainObject, deepClone, setNestedValue, normalizeValidator } from './utils';
 
 /**
@@ -36,7 +36,7 @@ import { getNestedValue, isPlainObject, deepClone, setNestedValue, normalizeVali
  */
 export class Objecter {
   /**
-   * Default mapping options
+   * Default mapping options (immutable)
    */
   private static readonly DEFAULT_OPTIONS: Required<MappingOptions> = {
     throwOnValidationError: true,
@@ -47,6 +47,74 @@ export class Objecter {
     autoMap: false,
     validateSchema: null as unknown as SchemaValidateFn,
   };
+
+  /**
+   * Global options that override defaults
+   */
+  private static globalOptions: Partial<MappingOptions> = {};
+
+  /**
+   * Profile registry for reusable mapping definitions
+   */
+  private static readonly profiles = new Map<string, MappingProfile>();
+
+  /**
+   * Configures global default options for all conversions
+   * These options will be merged with DEFAULT_OPTIONS and can be overridden per-call
+   *
+   * @param options - Global options to set
+   */
+  public static configure(options: Partial<MappingOptions>): void {
+    this.globalOptions = { ...this.globalOptions, ...options };
+  }
+
+  /**
+   * Resets global options to empty (uses only DEFAULT_OPTIONS)
+   */
+  public static resetConfig(): void {
+    this.globalOptions = {};
+  }
+
+  /**
+   * Registers a mapping profile for reuse
+   *
+   * @param profile - Mapping profile definition
+   * @returns The registered profile (for chaining or type-safe name usage)
+   * @throws {MappingError} When profile name is empty
+   */
+  public static registerProfile<TTarget = unknown>(profile: MappingProfile<TTarget>): MappingProfile<TTarget> {
+    if (!profile.name || typeof profile.name !== 'string' || profile.name.trim() === '') {
+      throw new MappingError('Profile name must be a non-empty string', 'profileName', profile.name);
+    }
+    this.validateMappingConfig(profile.mapping);
+    this.profiles.set(profile.name, profile as MappingProfile);
+    return profile;
+  }
+
+  /**
+   * Clears all registered profiles
+   */
+  public static clearProfiles(): void {
+    this.profiles.clear();
+  }
+
+  /**
+   * Maps a source object using a registered profile
+   *
+   * @param source - Source object to map
+   * @param profileName - Name of the registered profile
+   * @param options - Optional override options (merged with profile and global options)
+   * @returns Mapped target object
+   * @throws {MappingError} When profile is not found
+   */
+  public static map<TTarget>(source: unknown, profileName: string, options?: MappingOptions): TTarget {
+    const profile = this.profiles.get(profileName);
+    if (!profile) {
+      throw new MappingError(`Profile '${profileName}' not found`, 'profileName', profileName);
+    }
+    const mergedOptions = { ...profile.options, ...options };
+    return this.convert(source, profile.targetClass, profile.mapping, mergedOptions) as TTarget;
+  }
 
   /**
    * Converts a source object to a target class instance using the provided mapping
@@ -69,7 +137,7 @@ export class Objecter {
       throw new MappingError('Source object cannot be null or undefined', 'source', source);
     }
 
-    const mergedOptions = { ...this.DEFAULT_OPTIONS, ...options };
+    const mergedOptions = { ...this.DEFAULT_OPTIONS, ...this.globalOptions, ...options };
     const target = new targetClass();
     const context: MappingContext = { source, targetType: targetClass, data: mergedOptions.context };
 

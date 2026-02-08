@@ -73,7 +73,9 @@ function validateSecureKey(key: string, path: string): void {
  * Handles array index notation in path and returns the target object
  */
 function handleArrayPath(current: Record<string, unknown>, key: string, path: string): Record<string, unknown> {
+  // arrayMatch is guaranteed by the caller (setNestedValue)
   const arrayMatch = new RegExp(/^(\w+)\[(\d+)\]$/).exec(key);
+  /* istanbul ignore next */
   if (!arrayMatch) {
     return current;
   }

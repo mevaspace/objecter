@@ -1,4 +1,4 @@
-import { Validators } from './validator';
+import { Validators } from '../../../src/validators/validator';
 
 describe('Validators', () => {
   describe('required', () => {

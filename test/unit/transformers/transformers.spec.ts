@@ -1,4 +1,4 @@
-import { Transformers } from './transformers';
+import { Transformers } from '../../../src/transformers/transformers';
 
 describe('Transformers', () => {
   describe('toUpperCase', () => {

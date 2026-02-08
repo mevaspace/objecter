@@ -1,5 +1,5 @@
-import { getNestedValue, setNestedValue, pathCache } from './nested-property.utils';
-import { deepClone, isPlainObject } from './object.utils';
+import { getNestedValue, setNestedValue, pathCache } from '../../../src/utils/nested-property.utils';
+import { deepClone, isPlainObject } from '../../../src/utils/object.utils';
 
 describe('nested-property.utils', () => {
   describe('Memory Leak Prevention', () => {

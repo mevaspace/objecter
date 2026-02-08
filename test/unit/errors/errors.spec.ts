@@ -1,4 +1,4 @@
-import { MappingError, ValidationError, isMappingError, isValidationError } from './index';
+import { MappingError, ValidationError, isMappingError, isValidationError } from '../../../src/errors/index';
 
 describe('MappingError', () => {
   it('should create error with message and field', () => {

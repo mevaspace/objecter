@@ -1,9 +1,9 @@
-import { Objecter } from './objecter';
-import { MappingError, ValidationError } from './errors';
-import { Validators } from './validators';
-import { Transformers } from './transformers';
-import { Validator } from './types/validator.type';
-import { SkipIfPredicate, SchemaValidateFn } from './types';
+import { Objecter } from '../../src/objecter';
+import { MappingError, ValidationError } from '../../src/errors';
+import { Validators } from '../../src/validators';
+import { Transformers } from '../../src/transformers';
+import { Validator } from '../../src/types/validator.type';
+import { SkipIfPredicate, SchemaValidateFn, MappingContext } from '../../src/types';
 
 class SourceClass {
   id: number = 0;
@@ -326,6 +326,33 @@ describe('Objecter', () => {
       expect(result.subs).toHaveLength(2);
       expect(result.subs[0]).toBeInstanceOf(TargetClass);
       expect(result.subs[0].name).toBe('Item1');
+    });
+
+    it('should merge context data when used as a transform', () => {
+      // Covers: prepareRuntimeOptions context merging
+      const subMapping = [
+        {
+          from: 'name',
+          transform: (val: string, _src: unknown, context?: MappingContext) => {
+            // Append suffix from context
+            const suffix = (context?.data?.suffix || '') as string;
+            return val + suffix;
+          },
+        },
+      ];
+      const subArrayMapper = Objecter.createArrayMapper(TargetClass, subMapping);
+
+      const source = { subs: [{ name: 'Item' }] };
+      class MainTarget {
+        subs: TargetClass[] = [];
+      }
+      const mainMapping = [{ from: 'subs', to: 'subs', transform: subArrayMapper }];
+
+      // Pass context data 'suffix'
+      const result = Objecter.convert(source, MainTarget, mainMapping, { context: { suffix: '_CTX' } });
+
+      expect(result.subs).toHaveLength(1);
+      expect(result.subs[0].name).toBe('Item_CTX');
     });
   });
 

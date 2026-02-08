@@ -24,10 +24,10 @@
     "build": "tsup src/index.ts --format cjs,esm --dts --minify --clean",
     "postbuild": "ts-node scripts/copy-package.ts",
     "test": "pnpm test:unit && pnpm test:e2e",
-    "test:unit": "jest -c jest.unit.config.json",
-    "test:cov": "jest -c jest.unit.config.json --coverage",
+    "test:unit": "jest -c test/jest.unit.config.json",
+    "test:cov": "jest -c test/jest.unit.config.json --coverage",
     "pretest:e2e": "pnpm build",
-    "test:e2e": "jest -c jest.e2e.config.json && node test/e2e/wrapper.test.js && node test/e2e/wrapper.test.mjs",
+    "test:e2e": "jest -c test/jest.e2e.config.json && node test/e2e/wrapper.test.js && node test/e2e/wrapper.test.mjs",
     "prepare": "husky"
   },
   "packageManager": "pnpm@10.26.1",

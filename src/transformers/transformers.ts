@@ -1,6 +1,9 @@
 import { TransformFn } from '../types';
 import { getNestedValue } from '../utils';
 
+const TRUTHY_VALUES = new Set(['true', '1', 'yes', 'on']);
+const FALSY_VALUES = new Set(['false', '0', 'no', 'off']);
+
 /**
  * Collection of common transform functions
  */
@@ -47,8 +50,8 @@ export const Transformers = {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') {
       const lower = value.toLowerCase();
-      if (['true', '1', 'yes', 'on'].includes(lower)) return true;
-      if (['false', '0', 'no', 'off'].includes(lower)) return false;
+      if (TRUTHY_VALUES.has(lower)) return true;
+      if (FALSY_VALUES.has(lower)) return false;
     }
     return Boolean(value);
   },

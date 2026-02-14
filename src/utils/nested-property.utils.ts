@@ -1,25 +1,57 @@
 /**
- * Cache for parsed path parts to avoid repeated string splitting
+ * Precompiled regex for array index notation (e.g. 'items[0]')
  */
-/**
- * Cache for parsed path parts to avoid repeated string splitting
- * Exported for testing purposes
- */
-export const pathCache = new Map<string, string[]>();
+const ARRAY_INDEX_REGEX = /^(\w+)\[(\d+)\]$/;
 
 /**
- * Gets cached path parts or parses and caches them
+ * Set of forbidden keys to prevent prototype pollution
  */
-function getPathParts(path: string): string[] {
-  let parts = pathCache.get(path);
-  if (!parts) {
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Parsed segment representing a single key in a dot-notation path
+ */
+interface ParsedSegment {
+  raw: string;
+  isArray: boolean;
+  arrayKey: string;
+  arrayIndex: number;
+}
+
+/**
+ * Cache for fully parsed path segments to avoid repeated string splitting and regex matching
+ * Exported for testing purposes
+ */
+export const pathCache = new Map<string, ParsedSegment[]>();
+
+/**
+ * Parses a single key into a ParsedSegment
+ */
+function parseSegment(key: string): ParsedSegment {
+  const match = ARRAY_INDEX_REGEX.exec(key);
+  if (match) {
+    return { raw: key, isArray: true, arrayKey: match[1], arrayIndex: Number.parseInt(match[2], 10) };
+  }
+  return { raw: key, isArray: false, arrayKey: '', arrayIndex: 0 };
+}
+
+/**
+ * Gets cached parsed segments or parses and caches them
+ */
+function getPathSegments(path: string): ParsedSegment[] {
+  let segments = pathCache.get(path);
+  if (!segments) {
     if (pathCache.size >= 1000) {
       pathCache.clear();
     }
-    parts = path.split('.');
-    pathCache.set(path, parts);
+    const parts = path.split('.');
+    segments = new Array<ParsedSegment>(parts.length);
+    for (let i = 0; i < parts.length; i++) {
+      segments[i] = parseSegment(parts[i]);
+    }
+    pathCache.set(path, segments);
   }
-  return parts;
+  return segments;
 }
 
 /**
@@ -31,10 +63,10 @@ export function getNestedValue(obj: unknown, path: string): unknown {
     return undefined;
   }
 
-  const keys = getPathParts(path);
+  const segments = getPathSegments(path);
   let current: unknown = obj;
 
-  for (const key of keys) {
+  for (let i = 0; i < segments.length; i++) {
     if (current === null || current === undefined) {
       return undefined;
     }
@@ -43,17 +75,15 @@ export function getNestedValue(obj: unknown, path: string): unknown {
       return undefined;
     }
 
-    // Handle array index access (e.g., 'items[0].name' or 'items.0.name')
-    const arrayMatch = new RegExp(/^(\w+)\[(\d+)\]$/).exec(key);
-    if (arrayMatch) {
-      const [, arrayKey, indexStr] = arrayMatch;
-      const arr = (current as Record<string, unknown>)[arrayKey];
+    const seg = segments[i];
+    if (seg.isArray) {
+      const arr = (current as Record<string, unknown>)[seg.arrayKey];
       if (!Array.isArray(arr)) {
         return undefined;
       }
-      current = arr[Number.parseInt(indexStr, 10)];
+      current = arr[seg.arrayIndex];
     } else {
-      current = (current as Record<string, unknown>)[key];
+      current = (current as Record<string, unknown>)[seg.raw];
     }
   }
 
@@ -64,7 +94,7 @@ export function getNestedValue(obj: unknown, path: string): unknown {
  * Validates that a key is not a prototype pollution vector
  */
 function validateSecureKey(key: string, path: string): void {
-  if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+  if (FORBIDDEN_KEYS.has(key)) {
     throw new Error(`Security Error: Forbidden key '${key}' in path '${path}'`);
   }
 }
@@ -72,26 +102,21 @@ function validateSecureKey(key: string, path: string): void {
 /**
  * Handles array index notation in path and returns the target object
  */
-function handleArrayPath(current: Record<string, unknown>, key: string, path: string): Record<string, unknown> {
-  // arrayMatch is guaranteed by the caller (setNestedValue)
-  const arrayMatch = new RegExp(/^(\w+)\[(\d+)\]$/).exec(key);
-  /* istanbul ignore next */
-  if (!arrayMatch) {
-    return current;
-  }
+function handleArraySegment(
+  current: Record<string, unknown>,
+  seg: ParsedSegment,
+  path: string,
+): Record<string, unknown> {
+  validateSecureKey(seg.arrayKey, path);
 
-  const [, arrayKey, indexStr] = arrayMatch;
-  validateSecureKey(arrayKey, path);
-
-  const index = Number.parseInt(indexStr, 10);
-  if (!current[arrayKey]) {
-    current[arrayKey] = [];
+  if (!current[seg.arrayKey]) {
+    current[seg.arrayKey] = [];
   }
-  const arr = current[arrayKey] as unknown[];
-  if (!arr[index]) {
-    arr[index] = {};
+  const arr = current[seg.arrayKey] as unknown[];
+  if (!arr[seg.arrayIndex]) {
+    arr[seg.arrayIndex] = {};
   }
-  return arr[index] as Record<string, unknown>;
+  return arr[seg.arrayIndex] as Record<string, unknown>;
 }
 
 /**
@@ -100,28 +125,28 @@ function handleArrayPath(current: Record<string, unknown>, key: string, path: st
  * @example setNestedValue({}, 'user.name', 'John') => { user: { name: 'John' } }
  */
 export function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const keys = getPathParts(path);
+  const segments = getPathSegments(path);
   let current = obj;
+  const lastIndex = segments.length - 1;
 
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
-    validateSecureKey(key, path);
+  for (let i = 0; i < lastIndex; i++) {
+    const seg = segments[i];
 
-    const arrayMatch = new RegExp(/^(\w+)\[(\d+)\]$/).exec(key);
-    if (arrayMatch) {
-      current = handleArrayPath(current, key, path);
+    if (seg.isArray) {
+      current = handleArraySegment(current, seg, path);
     } else {
-      if (!current[key] || typeof current[key] !== 'object') {
-        current[key] = {};
+      validateSecureKey(seg.raw, path);
+      if (!current[seg.raw] || typeof current[seg.raw] !== 'object') {
+        current[seg.raw] = {};
       }
-      current = current[key] as Record<string, unknown>;
+      current = current[seg.raw] as Record<string, unknown>;
     }
   }
 
-  const finalKey = keys.at(-1);
-  if (!finalKey) {
+  const finalSeg = segments[lastIndex];
+  if (!finalSeg) {
     throw new Error(`Invalid path: empty final key in '${path}'`);
   }
-  validateSecureKey(finalKey, path);
-  current[finalKey] = value;
+  validateSecureKey(finalSeg.raw, path);
+  current[finalSeg.raw] = value;
 }

@@ -1,6 +1,5 @@
 #!/bin/sh
 
-pnpm test:unit
 pnpm test:cov
 
 pnpm dlx lint-staged

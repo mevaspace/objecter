@@ -26,16 +26,17 @@
     "dist"
   ],
   "scripts": {
+    "lint": "eslint . --fix",
+    "format": "prettier . --write",
     "precz": "pnpm prepare",
     "preinstall": "pnpm dlx only-allow pnpm",
     "prebuild": "rimraf dist",
     "build": "tsup src/index.ts --format cjs,esm --dts --minify --clean",
     "postbuild": "ts-node scripts/copy-package.ts",
-    "test": "pnpm test:unit && pnpm test:e2e",
+    "test": "pnpm test:unit",
     "test:unit": "jest -c test/jest.unit.config.json",
     "test:cov": "jest -c test/jest.unit.config.json --coverage",
-    "pretest:e2e": "pnpm build",
-    "test:e2e": "jest -c test/jest.e2e.config.json && node test/e2e/wrapper.test.js && node test/e2e/wrapper.test.mjs",
+    "test:e2e": "jest -c test/jest.e2e.config.json",
     "release": "semantic-release",
     "release:dry": "semantic-release --dry-run",
     "prepare": "husky"

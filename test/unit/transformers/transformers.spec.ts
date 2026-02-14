@@ -1,253 +1,253 @@
 import { Transformers } from '../../../src/transformers/transformers';
 
 describe('Transformers', () => {
-  describe('toUpperCase', () => {
-    it('should convert string to uppercase', () => {
-      const transform = Transformers.toUpperCase();
-      expect(transform('hello', {})).toBe('HELLO');
-    });
+  const dummySource = {};
+  const dummyContext = { source: {}, targetType: Object, data: {} } as any;
 
+  describe('toUpperCase()', () => {
+    const transform = Transformers.toUpperCase();
+    it('should uppercase string', () => {
+      expect(transform('hello', dummySource, dummyContext)).toBe('HELLO');
+    });
     it('should return non-string as-is', () => {
-      const transform = Transformers.toUpperCase();
-      expect(transform(123 as any, {})).toBe(123);
+      expect(transform(42 as any, dummySource, dummyContext)).toBe(42);
     });
   });
 
-  describe('toLowerCase', () => {
-    it('should convert string to lowercase', () => {
-      const transform = Transformers.toLowerCase();
-      expect(transform('HELLO', {})).toBe('hello');
+  describe('toLowerCase()', () => {
+    const transform = Transformers.toLowerCase();
+    it('should lowercase string', () => {
+      expect(transform('HELLO', dummySource, dummyContext)).toBe('hello');
+    });
+    it('should return non-string as-is', () => {
+      expect(transform(42 as any, dummySource, dummyContext)).toBe(42);
     });
   });
 
-  describe('trim', () => {
+  describe('trim()', () => {
+    const transform = Transformers.trim();
     it('should trim whitespace', () => {
-      const transform = Transformers.trim();
-      expect(transform('  hello  ', {})).toBe('hello');
+      expect(transform('  hello  ', dummySource, dummyContext)).toBe('hello');
+    });
+    it('should return non-string as-is', () => {
+      expect(transform(42 as any, dummySource, dummyContext)).toBe(42);
     });
   });
 
-  describe('toNumber', () => {
-    it('should convert string to number', () => {
-      const transform = Transformers.toNumber();
-      expect(transform('123', {})).toBe(123);
-      expect(transform('12.34', {})).toBe(12.34);
+  describe('toNumber()', () => {
+    const transform = Transformers.toNumber();
+    it('should convert valid number string', () => {
+      expect(transform('42', dummySource, dummyContext)).toBe(42);
     });
-
-    it('should throw for invalid number', () => {
-      const transform = Transformers.toNumber();
-      expect(() => transform('abc', {})).toThrow('Cannot convert');
+    it('should convert numeric value', () => {
+      expect(transform(3.14, dummySource, dummyContext)).toBe(3.14);
     });
-
-    it('should throw for null/undefined/empty string (Strict Mode)', () => {
-      const transform = Transformers.toNumber();
-      expect(() => transform(null, {})).toThrow();
-      expect(() => transform(undefined, {})).toThrow();
-      expect(() => transform('', {})).toThrow();
+    it('should throw for null', () => {
+      expect(() => transform(null, dummySource, dummyContext)).toThrow(TypeError);
+    });
+    it('should throw for undefined', () => {
+      expect(() => transform(undefined, dummySource, dummyContext)).toThrow(TypeError);
+    });
+    it('should throw for empty string', () => {
+      expect(() => transform('', dummySource, dummyContext)).toThrow(TypeError);
+    });
+    it('should throw for NaN-producing value', () => {
+      expect(() => transform('abc', dummySource, dummyContext)).toThrow(TypeError);
+    });
+    it('should throw for symbol with readable message', () => {
+      expect(() => transform(Symbol('test'), dummySource, dummyContext)).toThrow(TypeError);
     });
   });
 
-  describe('toString', () => {
+  describe('toString()', () => {
+    const transform = Transformers.toString();
     it('should convert number to string', () => {
-      const transform = Transformers.toString();
-      expect(transform(123, {})).toBe('123');
+      expect(transform(42, dummySource, dummyContext)).toBe('42');
+    });
+    it('should convert boolean to string', () => {
+      expect(transform(true, dummySource, dummyContext)).toBe('true');
     });
   });
 
-  describe('toBoolean', () => {
+  describe('toBoolean()', () => {
+    const transform = Transformers.toBoolean();
     it('should return boolean as-is', () => {
-      const transform = Transformers.toBoolean();
-      expect(transform(true, {})).toBe(true);
-      expect(transform(false, {})).toBe(false);
+      expect(transform(true, dummySource, dummyContext)).toBe(true);
+      expect(transform(false, dummySource, dummyContext)).toBe(false);
     });
-
     it('should convert truthy strings', () => {
-      const transform = Transformers.toBoolean();
-      expect(transform('true', {})).toBe(true);
-      expect(transform('1', {})).toBe(true);
-      expect(transform('yes', {})).toBe(true);
-      expect(transform('on', {})).toBe(true);
+      expect(transform('true', dummySource, dummyContext)).toBe(true);
+      expect(transform('1', dummySource, dummyContext)).toBe(true);
+      expect(transform('yes', dummySource, dummyContext)).toBe(true);
+      expect(transform('on', dummySource, dummyContext)).toBe(true);
+      expect(transform('TRUE', dummySource, dummyContext)).toBe(true);
     });
-
     it('should convert falsy strings', () => {
-      const transform = Transformers.toBoolean();
-      expect(transform('false', {})).toBe(false);
-      expect(transform('0', {})).toBe(false);
-      expect(transform('no', {})).toBe(false);
-      expect(transform('off', {})).toBe(false);
+      expect(transform('false', dummySource, dummyContext)).toBe(false);
+      expect(transform('0', dummySource, dummyContext)).toBe(false);
+      expect(transform('no', dummySource, dummyContext)).toBe(false);
+      expect(transform('off', dummySource, dummyContext)).toBe(false);
     });
-
-    it('should convert non-boolean/string using Boolean()', () => {
-      const transform = Transformers.toBoolean();
-      expect(transform(1, {})).toBe(true);
-      expect(transform(0, {})).toBe(false);
-      expect(transform(null, {})).toBe(false);
+    it('should use Boolean() for unrecognized strings', () => {
+      expect(transform('random', dummySource, dummyContext)).toBe(true);
+    });
+    it('should use Boolean() for non-string types', () => {
+      expect(transform(1, dummySource, dummyContext)).toBe(true);
+      expect(transform(0, dummySource, dummyContext)).toBe(false);
     });
   });
 
-  describe('toDate', () => {
-    it('should convert string to Date', () => {
-      const transform = Transformers.toDate();
-      const result = transform('2024-01-01', {});
+  describe('toDate()', () => {
+    const transform = Transformers.toDate();
+    it('should return Date as-is', () => {
+      const date = new Date('2026-01-01');
+      expect(transform(date, dummySource, dummyContext)).toBe(date);
+    });
+    it('should convert valid date string', () => {
+      const result = transform('2026-01-01', dummySource, dummyContext);
       expect(result).toBeInstanceOf(Date);
+      expect(result.getFullYear()).toBe(2026);
     });
-
-    it('should throw for invalid date', () => {
-      const transform = Transformers.toDate();
-      expect(() => transform('invalid', {})).toThrow('Cannot convert');
+    it('should convert timestamp number', () => {
+      const ts = Date.now();
+      const result = transform(ts, dummySource, dummyContext);
+      expect(result.getTime()).toBe(ts);
     });
-
-    it('should return Date instance as-is', () => {
-      const transform = Transformers.toDate();
-      const date = new Date('2024-01-01');
-      const result = transform(date, {});
-      expect(result).toBe(date);
-    });
-  });
-
-  describe('toISOString', () => {
-    it('should format Date to ISO string', () => {
-      const transform = Transformers.toISOString();
-      const date = new Date('2024-01-01T00:00:00.000Z');
-      expect(transform(date, {})).toBe('2024-01-01T00:00:00.000Z');
-    });
-
-    it('should convert string to ISO string', () => {
-      const transform = Transformers.toISOString();
-      expect(transform('2024-01-01T00:00:00.000Z', {})).toBe('2024-01-01T00:00:00.000Z');
-    });
-
     it('should throw for invalid date string', () => {
-      const transform = Transformers.toISOString();
-      expect(() => transform('invalid-date', {})).toThrow('Cannot convert');
+      expect(() => transform('not-a-date', dummySource, dummyContext)).toThrow(TypeError);
     });
   });
 
-  describe('parseJSON', () => {
-    it('should parse valid JSON', () => {
-      const transform = Transformers.parseJSON<{ a: number }>();
-      expect(transform('{"a":1}', {})).toEqual({ a: 1 });
+  describe('toISOString()', () => {
+    const transform = Transformers.toISOString();
+    it('should convert Date to ISO string', () => {
+      const date = new Date('2026-01-01T00:00:00.000Z');
+      expect(transform(date, dummySource, dummyContext)).toBe('2026-01-01T00:00:00.000Z');
     });
+    it('should convert valid date string to ISO string', () => {
+      const result = transform('2026-06-15', dummySource, dummyContext);
+      expect(result).toContain('2026-06-15');
+    });
+    it('should throw for invalid input', () => {
+      expect(() => transform('invalid', dummySource, dummyContext)).toThrow(TypeError);
+    });
+  });
 
+  describe('parseJSON()', () => {
+    const transform = Transformers.parseJSON<{ a: number }>();
+    it('should parse valid JSON string', () => {
+      expect(transform('{"a":1}', dummySource, dummyContext)).toEqual({ a: 1 });
+    });
     it('should throw for invalid JSON', () => {
-      const transform = Transformers.parseJSON();
-      expect(() => transform('invalid', {})).toThrow('Invalid JSON');
+      expect(() => transform('{invalid}', dummySource, dummyContext)).toThrow(SyntaxError);
     });
-
-    it('should return non-string value as-is', () => {
-      const transform = Transformers.parseJSON<{ a: number }>();
+    it('should return non-string as-is', () => {
       const obj = { a: 1 };
-      expect(transform(obj as unknown as string, {})).toBe(obj);
+      expect(transform(obj as any, dummySource, dummyContext)).toBe(obj);
     });
   });
 
-  describe('toJSON', () => {
-    it('should convert object to JSON', () => {
-      const transform = Transformers.toJSON();
-      expect(transform({ a: 1 }, {})).toBe('{"a":1}');
+  describe('toJSON()', () => {
+    const transform = Transformers.toJSON();
+    it('should serialize object to JSON string', () => {
+      expect(transform({ a: 1 }, dummySource, dummyContext)).toBe('{"a":1}');
+    });
+    it('should serialize primitives', () => {
+      expect(transform(42, dummySource, dummyContext)).toBe('42');
     });
   });
 
-  describe('round', () => {
+  describe('round()', () => {
+    it('should round to 0 decimals by default', () => {
+      expect(Transformers.round()(3.7, dummySource, dummyContext)).toBe(4);
+    });
     it('should round to specified decimals', () => {
-      const transform = Transformers.round(2);
-      expect(transform(3.14159, {})).toBe(3.14);
-    });
-
-    it('should round to integer by default', () => {
-      const transform = Transformers.round();
-      expect(transform(3.7, {})).toBe(4);
+      expect(Transformers.round(2)(3.456, dummySource, dummyContext)).toBe(3.46);
     });
   });
 
-  describe('clamp', () => {
-    it('should clamp below min', () => {
-      const transform = Transformers.clamp(0, 100);
-      expect(transform(-10, {})).toBe(0);
+  describe('clamp()', () => {
+    const transform = Transformers.clamp(0, 100);
+    it('should return value within range', () => {
+      expect(transform(50, dummySource, dummyContext)).toBe(50);
     });
-
-    it('should clamp above max', () => {
-      const transform = Transformers.clamp(0, 100);
-      expect(transform(150, {})).toBe(100);
+    it('should clamp below minimum', () => {
+      expect(transform(-5, dummySource, dummyContext)).toBe(0);
     });
-
-    it('should not change value in range', () => {
-      const transform = Transformers.clamp(0, 100);
-      expect(transform(50, {})).toBe(50);
+    it('should clamp above maximum', () => {
+      expect(transform(200, dummySource, dummyContext)).toBe(100);
     });
   });
 
-  describe('defaultTo', () => {
+  describe('defaultTo()', () => {
+    const transform = Transformers.defaultTo('N/A');
+    it('should return value if not null/undefined', () => {
+      expect(transform('hello', dummySource, dummyContext)).toBe('hello');
+    });
     it('should return default for null', () => {
-      const transform = Transformers.defaultTo('default');
-      expect(transform(null, {})).toBe('default');
+      expect(transform(null, dummySource, dummyContext)).toBe('N/A');
     });
-
     it('should return default for undefined', () => {
-      const transform = Transformers.defaultTo('default');
-      expect(transform(undefined, {})).toBe('default');
-    });
-
-    it('should return value if defined', () => {
-      const transform = Transformers.defaultTo('default');
-      expect(transform('value', {})).toBe('value');
+      expect(transform(undefined, dummySource, dummyContext)).toBe('N/A');
     });
   });
 
-  describe('mapValue', () => {
-    it('should map value', () => {
-      const transform = Transformers.mapValue({ a: 'A', b: 'B' });
-      expect(transform('a', {})).toBe('A');
+  describe('mapValue()', () => {
+    it('should map known value', () => {
+      const transform = Transformers.mapValue({ a: 1, b: 2 });
+      expect(transform('a', dummySource, dummyContext)).toBe(1);
     });
-
-    it('should return fallback if not found', () => {
-      const transform = Transformers.mapValue({ a: 'A' }, 'X');
-      expect(transform('z', {})).toBe('X');
+    it('should use fallback for unknown value', () => {
+      const transform = Transformers.mapValue({ a: 1 }, 0);
+      expect(transform('z', dummySource, dummyContext)).toBe(0);
     });
-
-    it('should throw if not found and no fallback', () => {
-      const transform = Transformers.mapValue({ a: 'A' });
-      expect(() => transform('z', {})).toThrow('No mapping found');
+    it('should throw for unknown value without fallback', () => {
+      const transform = Transformers.mapValue({ a: 1 });
+      expect(() => transform('z', dummySource, dummyContext)).toThrow("No mapping found for value 'z'");
     });
   });
 
-  describe('pipe', () => {
-    it('should chain transforms', () => {
+  describe('pipe()', () => {
+    it('should chain multiple transforms', () => {
       const transform = Transformers.pipe(Transformers.trim(), Transformers.toUpperCase());
-      expect(transform('  hello  ', {})).toBe('HELLO');
+      expect(transform('  hello  ', dummySource, dummyContext)).toBe('HELLO');
     });
   });
 
-  describe('when', () => {
-    it('should apply transform when condition true', () => {
-      const transform = Transformers.when<string>((v) => v.length > 3, Transformers.toUpperCase());
-      expect(transform('hello', {})).toBe('HELLO');
+  describe('when()', () => {
+    const transform = Transformers.when((v: string) => v.length > 3, Transformers.toUpperCase());
+    it('should apply transform when predicate is true', () => {
+      expect(transform('hello', dummySource, dummyContext)).toBe('HELLO');
     });
-
-    it('should return as-is when condition false', () => {
-      const transform = Transformers.when<string>((v) => v.length > 10, Transformers.toUpperCase());
-      expect(transform('hello', {})).toBe('hello');
+    it('should return original when predicate is false', () => {
+      expect(transform('hi', dummySource, dummyContext)).toBe('hi');
     });
   });
 
-  describe('pick', () => {
+  describe('pick()', () => {
     it('should extract nested value', () => {
-      const transform = Transformers.pick('user.name');
-      expect(transform({ user: { name: 'John' } }, {})).toBe('John');
+      const transform = Transformers.pick<string>('user.name');
+      expect(transform({ user: { name: 'John' } }, dummySource, dummyContext)).toBe('John');
     });
   });
 
-  describe('split', () => {
-    it('should split string by delimiter', () => {
-      const transform = Transformers.split(',');
-      expect(transform('a,b,c', {})).toEqual(['a', 'b', 'c']);
+  describe('split()', () => {
+    const transform = Transformers.split(',');
+    it('should split string', () => {
+      expect(transform('a,b,c', dummySource, dummyContext)).toEqual(['a', 'b', 'c']);
+    });
+    it('should return empty array for non-string', () => {
+      expect(transform(42 as any, dummySource, dummyContext)).toEqual([]);
     });
   });
 
-  describe('join', () => {
-    it('should join array by delimiter', () => {
-      const transform = Transformers.join('-');
-      expect(transform(['a', 'b', 'c'], {})).toBe('a-b-c');
+  describe('join()', () => {
+    const transform = Transformers.join('-');
+    it('should join array', () => {
+      expect(transform(['a', 'b', 'c'], dummySource, dummyContext)).toBe('a-b-c');
+    });
+    it('should convert non-array to string', () => {
+      expect(transform('hello' as any, dummySource, dummyContext)).toBe('hello');
     });
   });
 });

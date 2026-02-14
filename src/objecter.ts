@@ -1,79 +1,14 @@
-import { MappingError, ValidationError } from './errors';
-import {
-  MappingOptions,
-  Constructor,
-  FieldMapping,
-  MappingContext,
-  SchemaValidateFn,
-  AsyncSchemaValidateFn,
-  MappingProfile,
-} from './types';
-import {
-  getNestedValue,
-  isPlainObject,
-  deepClone,
-  setNestedValue,
-  normalizeValidator,
-  normalizeAsyncValidator,
-} from './utils';
+import { MappingError } from './errors';
+import { MappingOptions, Constructor, FieldMapping, MappingContext, MappingProfile } from './types';
+import * as ConfigManager from './core/config-manager';
+import * as ProfileRegistry from './core/profile-registry';
+import * as Converter from './core/object-converter';
 
 /**
  * Objecter - A lightweight object mapping library for TypeScript
  * Similar to MapStruct (Java) but without decorators
  */
-
-/**
- * Objecter - Main class for object mapping and transformation
- *
- * @example
- * ```typescript
- * class User {
- *   id: number;
- *   name: string;
- *   email: string;
- *   internalCode: string;
- * }
- *
- * class UserDto {
- *   id: number;
- *   name: string;
- *   email: string;
- * }
- *
- * const mapping = [
- *   { from: 'id', to: 'id' },
- *   { from: 'name', to: 'name', transform: (v) => v.toUpperCase() },
- *   { from: 'email', to: 'email' },
- * ];
- *
- * const userDto = Objecter.convert(user, UserDto, mapping);
- * ```
- */
 export class Objecter {
-  /**
-   * Default mapping options (immutable)
-   */
-  private static readonly DEFAULT_OPTIONS: Required<MappingOptions> = {
-    throwOnValidationError: true,
-    throwOnMissingFields: true,
-    copyUndefined: false,
-    context: {},
-    strictMapping: true,
-    autoMap: false,
-    validateSchema: null as unknown as SchemaValidateFn,
-    validateSchemaAsync: null as unknown as AsyncSchemaValidateFn,
-  };
-
-  /**
-   * Global options that override defaults
-   */
-  private static globalOptions: Partial<MappingOptions> = {};
-
-  /**
-   * Profile registry for reusable mapping definitions
-   */
-  private static readonly profiles = new Map<string, MappingProfile>();
-
   /**
    * Configures global default options for all conversions
    * These options will be merged with DEFAULT_OPTIONS and can be overridden per-call
@@ -81,14 +16,14 @@ export class Objecter {
    * @param options - Global options to set
    */
   public static configure(options: Partial<MappingOptions>): void {
-    this.globalOptions = { ...this.globalOptions, ...options };
+    ConfigManager.configure(options);
   }
 
   /**
    * Resets global options to empty (uses only DEFAULT_OPTIONS)
    */
   public static resetConfig(): void {
-    this.globalOptions = {};
+    ConfigManager.resetConfig();
   }
 
   /**
@@ -99,19 +34,14 @@ export class Objecter {
    * @throws {MappingError} When profile name is empty
    */
   public static registerProfile<TTarget = unknown>(profile: MappingProfile<TTarget>): MappingProfile<TTarget> {
-    if (!profile.name || typeof profile.name !== 'string' || profile.name.trim() === '') {
-      throw new MappingError('Profile name must be a non-empty string', 'profileName', profile.name);
-    }
-    this.validateMappingConfig(profile.mapping);
-    this.profiles.set(profile.name, profile as MappingProfile);
-    return profile;
+    return ProfileRegistry.registerProfile(profile);
   }
 
   /**
    * Clears all registered profiles
    */
   public static clearProfiles(): void {
-    this.profiles.clear();
+    ProfileRegistry.clearProfiles();
   }
 
   /**
@@ -124,12 +54,12 @@ export class Objecter {
    * @throws {MappingError} When profile is not found
    */
   public static map<TTarget>(source: unknown, profileName: string, options?: MappingOptions): TTarget {
-    const profile = this.profiles.get(profileName);
+    const profile = ProfileRegistry.getProfile(profileName);
     if (!profile) {
       throw new MappingError(`Profile '${profileName}' not found`, 'profileName', profileName);
     }
-    const mergedOptions = { ...profile.options, ...options };
-    return this.convert(source, profile.targetClass, profile.mapping, mergedOptions) as TTarget;
+    const mergedOptions = ConfigManager.getMergedOptions({ ...profile.options, ...options });
+    return Converter.convert(source, profile.targetClass, profile.mapping, mergedOptions) as TTarget;
   }
 
   /**
@@ -146,12 +76,12 @@ export class Objecter {
     profileName: string,
     options?: MappingOptions,
   ): Promise<TTarget> {
-    const profile = this.profiles.get(profileName);
+    const profile = ProfileRegistry.getProfile(profileName);
     if (!profile) {
       throw new MappingError(`Profile '${profileName}' not found`, 'profileName', profileName);
     }
-    const mergedOptions = { ...profile.options, ...options };
-    return this.convertAsync(source, profile.targetClass, profile.mapping, mergedOptions) as Promise<TTarget>;
+    const mergedOptions = ConfigManager.getMergedOptions({ ...profile.options, ...options });
+    return Converter.convertAsync(source, profile.targetClass, profile.mapping, mergedOptions) as Promise<TTarget>;
   }
 
   /**
@@ -171,43 +101,9 @@ export class Objecter {
     mapping: FieldMapping[],
     options?: MappingOptions,
   ): TTarget {
-    if (source === null || source === undefined) {
-      throw new MappingError('Source object cannot be null or undefined', 'source', source);
-    }
-    const { mergedOptions, target, context, validationErrors, mappedTargetProps } = this.initializeConversion(
-      source,
-      targetClass,
-      options,
-    );
-
-    for (const fieldMap of mapping) {
-      mappedTargetProps.add(fieldMap.to || fieldMap.from);
-      try {
-        this.processFieldMapping(
-          source,
-          target as Record<string, unknown>,
-          fieldMap,
-          context,
-          mergedOptions,
-          validationErrors,
-        );
-      } catch (error) {
-        this.wrapMappingError(error, fieldMap, source);
-      }
-    }
-
-    this.finalizeConversion(source, target, targetClass, mappedTargetProps, mergedOptions, validationErrors);
-
-    // Run schema-level validation if provided
-    if (mergedOptions.validateSchema) {
-      this.processSchemaValidationResult(
-        mergedOptions.validateSchema(target, source, context),
-        mergedOptions.throwOnValidationError,
-      );
-    }
-
-    return target;
-  } /* istanbul ignore next */
+    const mergedOptions = ConfigManager.getMergedOptions(options);
+    return Converter.convert(source, targetClass, mapping, mergedOptions);
+  }
 
   /**
    * Converts a source object to a target class instance with async transform support
@@ -226,49 +122,9 @@ export class Objecter {
     mapping: FieldMapping[],
     options?: MappingOptions,
   ): Promise<TTarget> {
-    if (source === null || source === undefined) {
-      throw new MappingError('Source object cannot be null or undefined', 'source', source);
-    }
-    const { mergedOptions, target, context, validationErrors, mappedTargetProps } = this.initializeConversion(
-      source,
-      targetClass,
-      options,
-    );
-
-    for (const fieldMap of mapping) {
-      mappedTargetProps.add(fieldMap.to || fieldMap.from);
-      try {
-        await this.processFieldMappingAsync(
-          source,
-          target as Record<string, unknown>,
-          fieldMap,
-          context,
-          mergedOptions,
-          validationErrors,
-        );
-      } catch (error) {
-        this.wrapMappingError(error, fieldMap, source);
-      }
-    }
-
-    this.finalizeConversion(source, target, targetClass, mappedTargetProps, mergedOptions, validationErrors);
-
-    if (mergedOptions.validateSchema) {
-      this.processSchemaValidationResult(
-        mergedOptions.validateSchema(target, source, context),
-        mergedOptions.throwOnValidationError,
-      );
-    }
-
-    if (mergedOptions.validateSchemaAsync) {
-      this.processSchemaValidationResult(
-        await mergedOptions.validateSchemaAsync(target, source, context),
-        mergedOptions.throwOnValidationError,
-      );
-    }
-
-    return target;
-  } /* istanbul ignore next */
+    const mergedOptions = ConfigManager.getMergedOptions(options);
+    return Converter.convertAsync(source, targetClass, mapping, mergedOptions);
+  }
 
   /**
    * Converts an array of source objects to target class instances
@@ -285,25 +141,8 @@ export class Objecter {
     mapping: FieldMapping[],
     options?: MappingOptions,
   ): TTarget[] {
-    if (!Array.isArray(sources)) {
-      throw new MappingError('Source must be an array', 'sources', sources);
-    }
-
-    return sources.map((source, index) => {
-      try {
-        return this.convert(source, targetClass, mapping, options);
-      } catch (error) {
-        if (error instanceof MappingError) {
-          throw new MappingError(
-            `Error at index ${index}: ${error.message}`,
-            `[${index}].${error.field}`,
-            error.sourceValue,
-            error.errors,
-          );
-        }
-        throw error;
-      }
-    });
+    const mergedOptions = ConfigManager.getMergedOptions(options);
+    return Converter.convertArray(sources, targetClass, mapping, mergedOptions);
   }
 
   /**
@@ -321,29 +160,8 @@ export class Objecter {
     mapping: FieldMapping[],
     options?: MappingOptions,
   ): Promise<TTarget[]> {
-    if (!Array.isArray(sources)) {
-      throw new MappingError('Source must be an array', 'sources', sources);
-    }
-
-    const results: TTarget[] = [];
-    for (let index = 0; index < sources.length; index++) {
-      const source = sources[index];
-      try {
-        const result = await this.convertAsync(source, targetClass, mapping, options);
-        results.push(result);
-      } catch (error) {
-        if (error instanceof MappingError) {
-          throw new MappingError(
-            `Error at index ${index}: ${error.message}`,
-            `[${index}].${error.field}`,
-            error.sourceValue,
-            error.errors,
-          );
-        }
-        throw error;
-      }
-    }
-    return results;
+    const mergedOptions = ConfigManager.getMergedOptions(options);
+    return Converter.convertArrayAsync(sources, targetClass, mapping, mergedOptions);
   }
 
   /**
@@ -356,32 +174,14 @@ export class Objecter {
    * @param options - Optional mapping configuration
    * @yields Target class instance
    */
-  public static *convertArrayGenerator<TSource, TTarget>(
+  public static convertArrayGenerator<TSource, TTarget>(
     sources: TSource[],
     targetClass: Constructor<TTarget>,
     mapping: FieldMapping[],
     options?: MappingOptions,
   ): Generator<TTarget> {
-    if (!Array.isArray(sources)) {
-      throw new MappingError('Source must be an array', 'sources', sources);
-    }
-
-    for (let index = 0; index < sources.length; index++) {
-      const source = sources[index];
-      try {
-        yield this.convert(source, targetClass, mapping, options);
-      } catch (error) {
-        if (error instanceof MappingError) {
-          throw new MappingError(
-            `Error at index ${index}: ${error.message}`,
-            `[${index}].${error.field}`,
-            error.sourceValue,
-            error.errors,
-          );
-        }
-        throw error;
-      }
-    }
+    const mergedOptions = ConfigManager.getMergedOptions(options);
+    return Converter.convertArrayGenerator(sources, targetClass, mapping, mergedOptions);
   }
 
   /**
@@ -397,12 +197,16 @@ export class Objecter {
     mapping: FieldMapping[],
     options?: MappingOptions,
   ): (source: TSource, _parent?: unknown, context?: MappingContext) => TTarget {
-    // Validate mapping configuration at creation time for early error detection
-    this.validateMappingConfig(mapping);
+    ProfileRegistry.validateMappingConfig(mapping);
 
     return (source: TSource, _parent?: unknown, context?: MappingContext) => {
-      const runtimeOptions = this.prepareRuntimeOptions(options, context);
-      return this.convert(source, targetClass, mapping, runtimeOptions);
+      // Merge with global options at runtime
+      const mergedOptions = ConfigManager.getMergedOptions(options);
+      // Merge context if provided
+      if (context?.data) {
+        mergedOptions.context = { ...mergedOptions.context, ...context.data };
+      }
+      return Converter.convert(source, targetClass, mapping, mergedOptions);
     };
   }
 
@@ -419,11 +223,14 @@ export class Objecter {
     mapping: FieldMapping[],
     options?: MappingOptions,
   ): (sources: TSource[], _parent?: unknown, context?: MappingContext) => TTarget[] {
-    this.validateMappingConfig(mapping);
+    ProfileRegistry.validateMappingConfig(mapping);
 
     return (sources: TSource[], _parent?: unknown, context?: MappingContext) => {
-      const runtimeOptions = this.prepareRuntimeOptions(options, context);
-      return this.convertArray(sources, targetClass, mapping, runtimeOptions);
+      const mergedOptions = ConfigManager.getMergedOptions(options);
+      if (context?.data) {
+        mergedOptions.context = { ...mergedOptions.context, ...context.data };
+      }
+      return Converter.convertArray(sources, targetClass, mapping, mergedOptions);
     };
   }
 
@@ -443,15 +250,8 @@ export class Objecter {
     mapping: FieldMapping[],
     options?: MappingOptions,
   ): TTarget {
-    const mergedSource: Record<string, unknown> = {};
-
-    for (const source of sources) {
-      if (source && typeof source === 'object') {
-        Object.assign(mergedSource, deepClone(source));
-      }
-    }
-
-    return this.convert(mergedSource, targetClass, mapping, options);
+    const mergedOptions = ConfigManager.getMergedOptions(options);
+    return Converter.merge(sources, targetClass, mapping, mergedOptions);
   }
 
   /**
@@ -462,360 +262,7 @@ export class Objecter {
    * @returns Plain object with mapped values
    */
   public static toPlainObject<TSource>(source: TSource, mapping?: FieldMapping[]): Record<string, unknown> {
-    if (source === null || source === undefined) {
-      throw new MappingError('Source object cannot be null or undefined', 'source', source);
-    }
-
-    if (!mapping) {
-      // If no mapping provided, shallow clone all enumerable properties
-      return { ...(source as object) } as Record<string, unknown>;
-    }
-
-    const result: Record<string, unknown> = {};
-    const context: MappingContext = { source, targetType: Object as unknown as Constructor<unknown>, data: {} };
-
-    for (const fieldMap of mapping) {
-      this.processFieldMapping(
-        source,
-        result,
-        fieldMap,
-        context,
-        { ...this.DEFAULT_OPTIONS, strictMapping: false },
-        new Map(),
-      );
-    }
-
-    return result;
-  }
-
-  // ============================================================================
-  // Private Helper Methods
-  // ============================================================================
-
-  /**
-   * Initializes the conversion context and variables
-   */
-  private static initializeConversion<TSource, TTarget>(
-    source: TSource,
-    targetClass: Constructor<TTarget>,
-    options?: MappingOptions,
-  ) {
-    const mergedOptions = { ...this.DEFAULT_OPTIONS, ...this.globalOptions, ...options };
-    const target = new targetClass();
-    const context: MappingContext = { source, targetType: targetClass, data: mergedOptions.context };
-    const validationErrors = new Map<string, string[]>();
-    const mappedTargetProps = new Set<string>();
-
-    return { mergedOptions, target, context, validationErrors, mappedTargetProps };
-  }
-
-  /**
-   * Finalizes the conversion by applying auto-mapping and throwing collected validation errors
-   */
-  private static finalizeConversion<TTarget>(
-    source: unknown,
-    target: TTarget,
-    targetClass: Constructor<any>,
-    mappedTargetProps: Set<string>,
-    mergedOptions: Required<MappingOptions>,
-    validationErrors: Map<string, string[]>,
-  ) {
-    this.applyAutoMapping(source, target as Record<string, unknown>, targetClass, mappedTargetProps, mergedOptions);
-
-    if (mergedOptions.throwOnValidationError) {
-      this.throwValidationErrors(validationErrors);
-    }
-  }
-
-  /**
-   * Processes schema validation result and throws error if needed
-   */
-  private static processSchemaValidationResult(
-    result: { valid: boolean; errors?: string[] },
-    throwOnError: boolean,
-  ): void {
-    if (!result.valid && result.errors && throwOnError) {
-      throw new ValidationError(
-        `Schema validation failed: ${result.errors.join(', ')}`,
-        new Map([['_schema', result.errors]]),
-      );
-    }
-  }
-
-  /**
-   * Wraps errors from field mapping with proper context
-   */
-  private static wrapMappingError(error: unknown, fieldMap: FieldMapping, source: unknown): never {
-    if (error instanceof MappingError) {
-      const newField = `${fieldMap.from}.${error.field}`;
-      throw new MappingError(error.message.replace(error.field, newField), newField, error.sourceValue, error.errors);
-    }
-    if (error instanceof ValidationError) {
-      throw error;
-    }
-
-    throw new MappingError(
-      `Error mapping field '${fieldMap.from}': ${(error as Error).message}`,
-      fieldMap.from,
-      getNestedValue(source, fieldMap.from),
-    );
-  }
-
-  /**
-   * Applies AutoMap logic to copy matching properties
-   */
-  private static applyAutoMapping(
-    source: unknown,
-    target: Record<string, unknown>,
-    targetClass: Constructor<unknown>,
-    mappedTargetProps: Set<string>,
-    options: Required<MappingOptions>,
-  ): void {
-    if (!options.autoMap || !isPlainObject(source)) {
-      return;
-    }
-
-    const sourceObj = source;
-    const targetKeys = new Set([
-      ...Object.getOwnPropertyNames(target),
-      ...Object.getOwnPropertyNames(targetClass.prototype),
-    ]);
-
-    for (const key of targetKeys) {
-      if (key === 'constructor') {
-        /* istanbul ignore next */
-        continue;
-      }
-      if (mappedTargetProps.has(key)) {
-        /* istanbul ignore next */
-        continue;
-      }
-
-      if (Object.hasOwn(sourceObj, key)) {
-        const value = sourceObj[key];
-        if (value === undefined && !options.copyUndefined) {
-          /* istanbul ignore next */
-          continue;
-        }
-        target[key] = deepClone(value);
-      }
-    }
-  }
-
-  /**
-   * Throws validation errors if any accumulated
-   */
-  private static throwValidationErrors(validationErrors: Map<string, string[]>): void {
-    if (validationErrors.size === 0) return;
-
-    const errorMessages = Array.from(validationErrors.entries())
-      .map(([field, errors]) => `${field}: ${errors.join(', ')}`)
-      .join('; ');
-    throw new ValidationError(`Validation failed: ${errorMessages}`, validationErrors);
-  }
-
-  /**
-   * Handles missing or null values with defaultValue and optional logic
-   */
-  private static handleMissingValue(
-    value: unknown,
-    fieldMap: FieldMapping,
-    options: Required<MappingOptions>,
-    source: unknown,
-    context: MappingContext,
-  ): { shouldSkip: boolean; processedValue: unknown } {
-    // Check skipIf predicate first (most flexible)
-    if (fieldMap.skipIf?.(value, source, context)) {
-      return { shouldSkip: true, processedValue: undefined };
-    }
-
-    if (value !== null && value !== undefined) {
-      return { shouldSkip: false, processedValue: value };
-    }
-
-    // Backward compatibility: skipIfNull is shorthand for skipIf((v) => v === null || v === undefined)
-    if (fieldMap.skipIfNull) {
-      return { shouldSkip: true, processedValue: undefined };
-    }
-
-    if (fieldMap.defaultValue !== undefined) {
-      return { shouldSkip: false, processedValue: deepClone(fieldMap.defaultValue) };
-    }
-
-    if (!fieldMap.optional && options.throwOnMissingFields) {
-      throw new Error(`Required field '${fieldMap.from}' is missing or null`);
-    }
-
-    if (!options.copyUndefined) {
-      return { shouldSkip: true, processedValue: undefined };
-    }
-
-    return { shouldSkip: false, processedValue: value };
-  }
-
-  /**
-   * Runs validators on a value and accumulates errors
-   */
-  private static runValidators(
-    value: unknown,
-    fieldMap: FieldMapping,
-    context: MappingContext,
-    validationErrors: Map<string, string[]>,
-  ): void {
-    if (!fieldMap.validate || value === undefined) {
-      return;
-    }
-
-    const validators = Array.isArray(fieldMap.validate) ? fieldMap.validate : [fieldMap.validate];
-    const targetField = fieldMap.to || fieldMap.from;
-
-    for (const validator of validators) {
-      const normalizedValidator = normalizeValidator(validator);
-      const result = normalizedValidator(value, fieldMap.from, context);
-      if (!result.valid && result.errors) {
-        const existingErrors = validationErrors.get(targetField) || [];
-        validationErrors.set(targetField, [...existingErrors, ...result.errors]);
-      }
-    }
-  }
-
-  /**
-   * Runs validators asynchronously on a value and accumulates errors
-   */
-  private static async runValidatorsAsync(
-    value: unknown,
-    fieldMap: FieldMapping,
-    context: MappingContext,
-    validationErrors: Map<string, string[]>,
-  ): Promise<void> {
-    if (value === undefined) {
-      return;
-    }
-
-    const targetField = fieldMap.to || fieldMap.from;
-
-    // Run sync validators first
-    if (fieldMap.validate) {
-      this.runValidators(value, fieldMap, context, validationErrors);
-    }
-
-    // Run async validators
-    if (fieldMap.validateAsync) {
-      const validators = Array.isArray(fieldMap.validateAsync) ? fieldMap.validateAsync : [fieldMap.validateAsync];
-
-      for (const validator of validators) {
-        const result = await normalizeAsyncValidator(validator, value, fieldMap.from, context);
-        if (!result.valid && result.errors) {
-          const existingErrors = validationErrors.get(targetField) || [];
-          validationErrors.set(targetField, [...existingErrors, ...result.errors]);
-        }
-      }
-    }
-  }
-
-  /**
-   * Processes a single field mapping
-   */
-  private static processFieldMapping(
-    source: unknown,
-    target: Record<string, unknown>,
-    fieldMap: FieldMapping,
-    context: MappingContext,
-    options: Required<MappingOptions>,
-    validationErrors: Map<string, string[]>,
-  ): void {
-    const { from, to = from, transform } = fieldMap;
-
-    let value = getNestedValue(source, from);
-
-    const { shouldSkip, processedValue } = this.handleMissingValue(value, fieldMap, options, source, context);
-    if (shouldSkip) return;
-
-    value = processedValue;
-
-    if (transform && value !== undefined) {
-      value = transform(value, source, context);
-    }
-
-    this.runValidators(value, fieldMap, context, validationErrors);
-
-    if (options.strictMapping && !(to in target)) {
-      throw new MappingError(`Strict mapping failed: Property '${to}' does not exist in target type`, to, value);
-    }
-
-    setNestedValue(target, to, value);
-  }
-
-  /**
-   * Processes a single field mapping with async transform support
-   */
-  private static async processFieldMappingAsync(
-    source: unknown,
-    target: Record<string, unknown>,
-    fieldMap: FieldMapping,
-    context: MappingContext,
-    options: Required<MappingOptions>,
-    validationErrors: Map<string, string[]>,
-  ): Promise<void> {
-    const { from, to = from, transform } = fieldMap;
-
-    let value = getNestedValue(source, from);
-
-    const { shouldSkip, processedValue } = this.handleMissingValue(value, fieldMap, options, source, context);
-    if (shouldSkip) return;
-
-    value = processedValue;
-
-    if (transform && value !== undefined) {
-      const result = transform(value, source, context);
-      value = result instanceof Promise ? await result : result;
-    }
-
-    await this.runValidatorsAsync(value, fieldMap, context, validationErrors);
-
-    if (options.strictMapping && !(to in target)) {
-      throw new MappingError(`Strict mapping failed: Property '${to}' does not exist in target type`, to, value);
-    }
-
-    setNestedValue(target, to, value);
-  }
-
-  /**
-   * Validates mapping configuration at creation time
-   */
-  private static validateMappingConfig(mapping: FieldMapping[]): void {
-    if (!Array.isArray(mapping)) {
-      throw new MappingError('Mapping must be an array', 'mapping', mapping);
-    }
-
-    const seenTargets = new Set<string>();
-
-    for (const fieldMap of mapping) {
-      if (!fieldMap.from || typeof fieldMap.from !== 'string') {
-        throw new MappingError("Invalid mapping: 'from' must be a non-empty string", 'from', fieldMap.from);
-      }
-
-      const targetPath = fieldMap.to || fieldMap.from;
-
-      if (seenTargets.has(targetPath)) {
-        console.warn(
-          `[Objecter] Warning: Duplicate target path '${targetPath}' in mapping. ` +
-            'Later mapping will override earlier one.',
-        );
-      }
-      seenTargets.add(targetPath);
-    }
-  }
-
-  /**
-   * Prepares runtime options by merging with execution context
-   */
-  private static prepareRuntimeOptions(options?: MappingOptions, context?: MappingContext): MappingOptions {
-    const runtimeOptions = { ...options };
-    if (context?.data) {
-      runtimeOptions.context = { ...options?.context, ...context.data };
-    }
-    return runtimeOptions;
+    return Converter.toPlainObject(source, mapping);
   }
 }
 

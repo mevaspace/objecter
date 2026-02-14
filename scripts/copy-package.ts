@@ -1,8 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const sourcePath = path.resolve(process.cwd(), 'package.json');
-const targetPath = path.resolve(process.cwd(), 'dist/package.json');
+const rootDir = path.resolve(process.cwd(), '..');
+const sourcePath = path.resolve(rootDir, 'package.json');
+const targetPath = path.resolve(rootDir, 'dist/package.json');
 
 const ALLOWED_KEYS = [
   'name',
@@ -75,8 +76,8 @@ function run() {
 
     const filesToCopy = ['README.md', 'CHANGELOG.md'];
     for (const file of filesToCopy) {
-      const src = path.resolve(process.cwd(), file);
-      const dest = path.resolve(process.cwd(), 'dist', file);
+      const src = path.resolve(rootDir, file);
+      const dest = path.resolve(rootDir, 'dist', file);
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, dest);
         console.warn(`Copied ${file} to dist/`);
@@ -85,6 +86,18 @@ function run() {
   } catch (error) {
     console.warn('Error copying package.json:', error);
     process.exit(1);
+  }
+
+  const coreDistPath = path.resolve(rootDir, 'core/dist');
+  const rootDist = path.resolve(rootDir, 'dist');
+  if (fs.existsSync(coreDistPath)) {
+    const files = fs.readdirSync(coreDistPath);
+    for (const file of files) {
+      const src = path.resolve(coreDistPath, file);
+      const dest = path.resolve(rootDist, file);
+      fs.copyFileSync(src, dest);
+      console.warn(`Copied ${file} to ${dest}`);
+    }
   }
 }
 

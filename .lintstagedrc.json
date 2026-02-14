@@ -1,4 +1,5 @@
 {
-  "src/**/*.ts": ["eslint -c eslint.config.mts src"],
-  "*": ["prettier --log-level=silent --write --config .prettierrc.json ."]
+  "core/src/**/*.ts": ["pnpm --filter @mevaspace/objecter-core lintstaged:lint"],
+  "benchmark/src/**/*.ts": ["pnpm --filter @mevaspace/objecter-benchmark lintstaged:lint"],
+  "*": ["prettier --log-level silent --config .prettierrc.json --ignore-unknown --write"]
 }

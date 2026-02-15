@@ -67,17 +67,19 @@ pnpm test:benchmark
 
 ## Installation
 
-> **Note**: Currently, this package is only available via GitHub Packages.
+> **Note**: Currently, this package is only available via GitHub Release Assets.
+>
+> Replace `v<version>` with the version you want to install (e.g., `v1.1.0`).
 
 ```bash
 # npm
-npm install @mevaspace/objecter --registry=https://npm.pkg.github.com
+npm install https://github.com/mevaspace/objecter/releases/download/v<version>/objecter.tar.gz
 
 # pnpm
-pnpm add @mevaspace/objecter --registry=https://npm.pkg.github.com
+pnpm add https://github.com/mevaspace/objecter/releases/download/v<version>/objecter.tar.gz
 
 # yarn
-yarn add @mevaspace/objecter --registry=https://npm.pkg.github.com
+yarn add https://github.com/mevaspace/objecter/releases/download/v<version>/objecter.tar.gz
 ```
 
 ## Usage
@@ -853,5 +855,5 @@ const omit = <T extends Record<string, any>>(keys: string[]): TransformFn => {
 ## Limitations
 
 1.  **Zero-Argument Constructor**: The target class **must** have a zero-argument constructor (or no constructor defined). Objecter instantiates the target using `new TargetClass()`.
-2.  **Circular References**: Objecter does **not** currently handle circular references (e.g., Parent -> Child -> Parent). Attempting to map circular structures will throw a `Circular reference detected during deep clone` error.
+2.  **Circular References**: Objecter handle circular references with options `checkCircular` (e.g., Parent -> Child -> Parent). Attempting to map circular structures will throw a `Circular reference detected during deep clone` error.
 3.  **Prototype Safety**: `autoMap` iterates over properties defined in the target instance and its prototype chain to determine what to copy. Ensure your target classes are simple DTOs.

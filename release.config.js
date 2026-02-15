@@ -1,5 +1,5 @@
 const headerPattern =
-  /^(?:[\u2300-\u23FF]|[\u2B05-\u2B07]|[\u2194-\u2199]|[\u2700-\u27BF]|[\u1F000-\u1F9FF]|[\u1F600-\u1F64F]|[\u1F680-\u1F6FF]|[\u1F300-\u1F5FF])\s(\w+)(?:\(([\w$.\-* ]+)\))?: (.*)$/; // NOSONAR
+  /^(?:(?:[\u2300-\u23FF]|[\u2B05-\u2B07]|[\u2194-\u2199]|[\u2700-\u27BF]|[\u1F000-\u1F9FF]|[\u1F600-\u1F64F]|[\u1F680-\u1F6FF]|[\u1F300-\u1F5FF])\s)?(\w+)(?:\(([\w$.\-* ]+)\))?: (.*)$/; // NOSONAR
 
 module.exports = {
   branches: ['master'],
@@ -14,7 +14,7 @@ module.exports = {
     ],
     '@semantic-release/changelog',
     ['@semantic-release/npm', { npmPublish: false }],
-    ['@semantic-release/exec', { prepareCmd: 'pnpm build' }],
+    ['@semantic-release/exec', { prepareCmd: 'pnpm build && tar -czf objecter.tar.gz -C dist .' }],
     ['@semantic-release/npm', { pkgRoot: 'dist' }],
     [
       '@semantic-release/git',
@@ -23,6 +23,6 @@ module.exports = {
         message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}',
       },
     ],
-    '@semantic-release/github',
+    ['@semantic-release/github', { assets: [{ path: 'objecter.tar.gz', label: 'Distribution' }] }],
   ],
 };

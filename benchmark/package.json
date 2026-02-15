@@ -11,11 +11,12 @@
     "@mevaspace/objecter": "file://../dist"
   },
   "dependencies": {
-    "class-transformer": "^0.5.1",
-    "reflect-metadata": "^0.1.14",
-    "@automapper/core": "^8.8.1",
     "@automapper/classes": "^8.8.1",
-    "mitata": "^1.0.10"
+    "@automapper/core": "^8.8.1",
+    "@mitata/counters": "^0.0.8",
+    "class-transformer": "^0.5.1",
+    "mitata": "^1.0.10",
+    "reflect-metadata": "^0.1.14"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

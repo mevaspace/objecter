@@ -30,7 +30,7 @@
     "format": "prettier --write --config .prettierrc.json .",
     "precz": "pnpm prepare",
     "preinstall": "pnpm dlx only-allow pnpm",
-    "pretest:benchmark": "pnpm build",
+    "pretest:benchmark": "pnpm build && pnpm --filter @mevaspace/objecter-benchmark install",
     "test:benchmark": "pnpm --filter @mevaspace/objecter-benchmark test",
     "test:unit": "pnpm --filter @mevaspace/objecter-core test:unit",
     "test:cov": "pnpm --filter @mevaspace/objecter-core test:cov",

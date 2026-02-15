@@ -66,7 +66,7 @@ export function getNestedValue(obj: unknown, path: string): unknown {
   const segments = getPathSegments(path);
   let current: unknown = obj;
 
-  for (let i = 0; i < segments.length; i++) {
+  for (const element of segments) {
     if (current === null || current === undefined) {
       return undefined;
     }
@@ -75,7 +75,7 @@ export function getNestedValue(obj: unknown, path: string): unknown {
       return undefined;
     }
 
-    const seg = segments[i];
+    const seg = element;
     if (seg.isArray) {
       const arr = (current as Record<string, unknown>)[seg.arrayKey];
       if (!Array.isArray(arr)) {

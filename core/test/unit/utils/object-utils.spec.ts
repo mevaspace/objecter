@@ -103,7 +103,7 @@ describe('deepClone', () => {
   it('should throw on circular reference', () => {
     const obj: Record<string, unknown> = { a: 1 };
     obj['self'] = obj;
-    expect(() => deepClone(obj)).toThrow('Circular reference detected during deep clone');
+    expect(() => deepClone(obj, true)).toThrow('Circular reference detected during deep clone');
   });
 
   it('should return function values as-is (by reference)', () => {

@@ -10,6 +10,7 @@ export const DEFAULT_OPTIONS: Required<MappingOptions> = {
   context: {},
   strictMapping: true,
   autoMap: false,
+  checkCircular: true,
   validateSchema: null as unknown as SchemaValidateFn,
   validateSchemaAsync: null as unknown as AsyncSchemaValidateFn,
 };

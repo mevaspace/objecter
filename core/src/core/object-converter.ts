@@ -26,12 +26,23 @@ export function convert<TSource, TTarget>(
     throw new MappingError('Source object cannot be null or undefined', 'source', source);
   }
 
-  const { target, context, validationErrors, mappedTargetProps } = initializeConversion(source, targetClass, options);
+  const { target, context } = initializeConversion(source, targetClass, options);
+  let { validationErrors, mappedTargetProps } = initializeConversion(source, targetClass, options);
 
   for (const fieldMap of mapping) {
-    mappedTargetProps.add(fieldMap.to || fieldMap.from);
+    if (options.autoMap) {
+      mappedTargetProps ??= new Set();
+      mappedTargetProps.add(fieldMap.to || fieldMap.from);
+    }
     try {
-      processFieldMapping(source, target as Record<string, unknown>, fieldMap, context, options, validationErrors);
+      validationErrors = processFieldMapping(
+        source,
+        target as Record<string, unknown>,
+        fieldMap,
+        context,
+        options,
+        validationErrors,
+      );
     } catch (error) {
       wrapMappingError(error, fieldMap, source);
     }
@@ -60,12 +71,16 @@ export async function convertAsync<TSource, TTarget>(
     throw new MappingError('Source object cannot be null or undefined', 'source', source);
   }
 
-  const { target, context, validationErrors, mappedTargetProps } = initializeConversion(source, targetClass, options);
+  const { target, context } = initializeConversion(source, targetClass, options);
+  let { validationErrors, mappedTargetProps } = initializeConversion(source, targetClass, options);
 
   for (const fieldMap of mapping) {
-    mappedTargetProps.add(fieldMap.to || fieldMap.from);
+    if (options.autoMap) {
+      mappedTargetProps ??= new Set();
+      mappedTargetProps.add(fieldMap.to || fieldMap.from);
+    }
     try {
-      await processFieldMappingAsync(
+      validationErrors = await processFieldMappingAsync(
         source,
         target as Record<string, unknown>,
         fieldMap,
@@ -234,7 +249,7 @@ export function merge<TTarget>(
 
   for (const source of sources) {
     if (source && typeof source === 'object') {
-      Object.assign(mergedSource, deepClone(source));
+      Object.assign(mergedSource, deepClone(source, options.checkCircular));
     }
   }
 
@@ -255,11 +270,11 @@ export function toPlainObject<TSource>(source: TSource, mapping?: FieldMapping[]
 
   const result: Record<string, unknown> = {};
   const context: MappingContext = { source, targetType: Object as unknown as Constructor<unknown>, data: {} };
-  const validationErrors = new Map<string, string[]>();
+  let validationErrors: Map<string, string[]> | undefined;
 
   for (const fieldMap of mapping) {
     try {
-      processFieldMapping(source, result, fieldMap, context, PLAIN_OBJECT_OPTIONS, validationErrors);
+      validationErrors = processFieldMapping(source, result, fieldMap, context, PLAIN_OBJECT_OPTIONS, validationErrors);
     } catch (error) {
       wrapMappingError(error, fieldMap, source);
     }

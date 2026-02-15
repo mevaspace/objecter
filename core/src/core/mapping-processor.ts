@@ -27,7 +27,7 @@ function handleMissingValue(
   }
 
   if (fieldMap.defaultValue !== undefined) {
-    return { shouldSkip: false, processedValue: deepClone(fieldMap.defaultValue) };
+    return { shouldSkip: false, processedValue: deepClone(fieldMap.defaultValue, options.checkCircular) };
   }
 
   if (!fieldMap.optional && options.throwOnMissingFields) {
@@ -44,15 +44,21 @@ function handleMissingValue(
 /**
  * Appends validation error messages to the error map for a given field
  */
-function accumulateErrors(targetField: string, errors: string[], validationErrors: Map<string, string[]>): void {
-  let fieldErrors = validationErrors.get(targetField);
+function accumulateErrors(
+  targetField: string,
+  errors: string[],
+  validationErrors: Map<string, string[]> | undefined,
+): Map<string, string[]> {
+  const map = validationErrors || new Map<string, string[]>();
+  let fieldErrors = map.get(targetField);
   if (!fieldErrors) {
     fieldErrors = [];
-    validationErrors.set(targetField, fieldErrors);
+    map.set(targetField, fieldErrors);
   }
   for (const err of errors) {
     fieldErrors.push(err);
   }
+  return map;
 }
 
 /**
@@ -62,22 +68,24 @@ function runValidators(
   value: unknown,
   fieldMap: FieldMapping,
   context: MappingContext,
-  validationErrors: Map<string, string[]>,
-): void {
+  validationErrors: Map<string, string[]> | undefined,
+): Map<string, string[]> | undefined {
   if (!fieldMap.validate || value === undefined) {
-    return;
+    return validationErrors;
   }
 
   const validators = Array.isArray(fieldMap.validate) ? fieldMap.validate : [fieldMap.validate];
   const targetField = fieldMap.to || fieldMap.from;
 
+  let currentErrors = validationErrors;
   for (const validator of validators) {
     const normalizedValidator = normalizeValidator(validator);
     const result = normalizedValidator(value, fieldMap.from, context);
     if (!result.valid && result.errors) {
-      accumulateErrors(targetField, result.errors, validationErrors);
+      currentErrors = accumulateErrors(targetField, result.errors, currentErrors);
     }
   }
+  return currentErrors;
 }
 
 /**
@@ -87,18 +95,20 @@ async function runValidatorsAsync(
   value: unknown,
   fieldMap: FieldMapping,
   context: MappingContext,
-  validationErrors: Map<string, string[]>,
-): Promise<void> {
+  validationErrors: Map<string, string[]> | undefined,
+): Promise<Map<string, string[]> | undefined> {
   if (value === undefined) {
-    return;
+    return validationErrors;
   }
 
+  let currentErrors = validationErrors;
+
   if (fieldMap.validate) {
-    runValidators(value, fieldMap, context, validationErrors);
+    currentErrors = runValidators(value, fieldMap, context, currentErrors);
   }
 
   if (!fieldMap.validateAsync) {
-    return;
+    return currentErrors;
   }
 
   const validators = Array.isArray(fieldMap.validateAsync) ? fieldMap.validateAsync : [fieldMap.validateAsync];
@@ -107,9 +117,10 @@ async function runValidatorsAsync(
   for (const validator of validators) {
     const result = await normalizeAsyncValidator(validator, value, fieldMap.from, context);
     if (!result.valid && result.errors) {
-      accumulateErrors(targetField, result.errors, validationErrors);
+      currentErrors = accumulateErrors(targetField, result.errors, currentErrors);
     }
   }
+  return currentErrors;
 }
 
 /**
@@ -121,14 +132,14 @@ export function processFieldMapping(
   fieldMap: FieldMapping,
   context: MappingContext,
   options: Required<MappingOptions>,
-  validationErrors: Map<string, string[]>,
-): void {
+  validationErrors: Map<string, string[]> | undefined,
+): Map<string, string[]> | undefined {
   const { from, to = from, transform } = fieldMap;
 
   let value = getNestedValue(source, from);
 
   const { shouldSkip, processedValue } = handleMissingValue(value, fieldMap, options, source, context);
-  if (shouldSkip) return;
+  if (shouldSkip) return validationErrors;
 
   value = processedValue;
 
@@ -136,13 +147,14 @@ export function processFieldMapping(
     value = transform(value, source, context);
   }
 
-  runValidators(value, fieldMap, context, validationErrors);
+  const updatedErrors = runValidators(value, fieldMap, context, validationErrors);
 
   if (options.strictMapping && !(to in target)) {
     throw new MappingError(`Strict mapping failed: Property '${to}' does not exist in target type`, to, value);
   }
 
   setNestedValue(target, to, value);
+  return updatedErrors;
 }
 
 /**
@@ -154,14 +166,14 @@ export async function processFieldMappingAsync(
   fieldMap: FieldMapping,
   context: MappingContext,
   options: Required<MappingOptions>,
-  validationErrors: Map<string, string[]>,
-): Promise<void> {
+  validationErrors: Map<string, string[]> | undefined,
+): Promise<Map<string, string[]> | undefined> {
   const { from, to = from, transform } = fieldMap;
 
   let value = getNestedValue(source, from);
 
   const { shouldSkip, processedValue } = handleMissingValue(value, fieldMap, options, source, context);
-  if (shouldSkip) return;
+  if (shouldSkip) return validationErrors;
 
   value = processedValue;
 
@@ -170,13 +182,14 @@ export async function processFieldMappingAsync(
     value = result instanceof Promise ? await result : result;
   }
 
-  await runValidatorsAsync(value, fieldMap, context, validationErrors);
+  const updatedErrors = await runValidatorsAsync(value, fieldMap, context, validationErrors);
 
   if (options.strictMapping && !(to in target)) {
     throw new MappingError(`Strict mapping failed: Property '${to}' does not exist in target type`, to, value);
   }
 
   setNestedValue(target, to, value);
+  return updatedErrors;
 }
 
 /**

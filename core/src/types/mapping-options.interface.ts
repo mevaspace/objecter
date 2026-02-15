@@ -45,6 +45,11 @@ export interface MappingOptions {
    */
   autoMap?: boolean;
   /**
+   * Whether to check for circular dependencies during deep cloning (default: true)
+   * Disabling this improves performance but risks stack overflow if circular references exist
+   */
+  checkCircular?: boolean;
+  /**
    * Schema-level validation function executed after all field mappings
    * Useful for validating business rules that depend on multiple fields
    */

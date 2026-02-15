@@ -27,10 +27,10 @@ describe('initializeConversion', () => {
     expect(context.targetType).toBe(Target);
   });
 
-  it('should initialize empty validationErrors and mappedTargetProps', () => {
+  it('should initialize undefined validationErrors and mappedTargetProps', () => {
     const { validationErrors, mappedTargetProps } = initializeConversion({}, Target, DEFAULT_OPTIONS);
-    expect(validationErrors.size).toBe(0);
-    expect(mappedTargetProps.size).toBe(0);
+    expect(validationErrors).toBeUndefined();
+    expect(mappedTargetProps).toBeUndefined();
   });
 
   it('should pass options.context as context.data', () => {

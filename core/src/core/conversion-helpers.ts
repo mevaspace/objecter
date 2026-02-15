@@ -13,15 +13,13 @@ export function initializeConversion<TSource, TTarget>(
 ): {
   target: TTarget;
   context: MappingContext;
-  validationErrors: Map<string, string[]>;
-  mappedTargetProps: Set<string>;
+  validationErrors: Map<string, string[]> | undefined;
+  mappedTargetProps: Set<string> | undefined;
 } {
   const target = new targetClass();
   const context: MappingContext = { source, targetType: targetClass, data: options.context };
-  const validationErrors = new Map<string, string[]>();
-  const mappedTargetProps = new Set<string>();
 
-  return { target, context, validationErrors, mappedTargetProps };
+  return { target, context, validationErrors: undefined, mappedTargetProps: undefined };
 }
 
 /**
@@ -31,7 +29,7 @@ export function applyAutoMapping(
   source: unknown,
   target: Record<string, unknown>,
   targetClass: Constructor<unknown>,
-  mappedTargetProps: Set<string>,
+  mappedTargetProps: Set<string> | undefined,
   options: Required<MappingOptions>,
 ): void {
   if (!options.autoMap || !isPlainObject(source)) {
@@ -48,7 +46,7 @@ export function applyAutoMapping(
     if (key === 'constructor') {
       continue;
     }
-    if (mappedTargetProps.has(key)) {
+    if (mappedTargetProps?.has(key)) {
       continue;
     }
 
@@ -57,7 +55,7 @@ export function applyAutoMapping(
       if (value === undefined && !options.copyUndefined) {
         continue;
       }
-      target[key] = deepClone(value);
+      target[key] = deepClone(value, options.checkCircular);
     }
   }
 }
@@ -81,13 +79,13 @@ export function finalizeConversion<TTarget>(
   source: unknown,
   target: TTarget,
   targetClass: Constructor<unknown>,
-  mappedTargetProps: Set<string>,
+  mappedTargetProps: Set<string> | undefined,
   options: Required<MappingOptions>,
-  validationErrors: Map<string, string[]>,
+  validationErrors: Map<string, string[]> | undefined,
 ): void {
   applyAutoMapping(source, target as Record<string, unknown>, targetClass, mappedTargetProps, options);
 
-  if (options.throwOnValidationError) {
+  if (options.throwOnValidationError && validationErrors) {
     throwValidationErrors(validationErrors);
   }
 }

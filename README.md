@@ -17,18 +17,67 @@ Influenced by [MapStruct](https://mapstruct.org/) (Java), Objecter provides a fu
 - **Functional Composition**: Use simple functions for transformations and validations.
 - **Flexible**: Specific mappings where you need them, auto-mapping where you don't.
 - **Zero Runtime Dependencies**: Lightweight and focused.
+- **Faster than Popular Packages**: See benchmarks for more details.
+
+## Benchmarks
+
+<img src="./assets/asset_benchmark_1m.png" alt="benchmark" />
+
+Objecter significantly outperforms other popular object mapping libraries across all dataset sizes, even with circular dependency checks enabled. Benchmarks were conducted using [mitata](https://github.com/evanwashere/mitata) on Node.js 24.10.0 with an AMD Ryzen 5 5500U processor.
+
+### Performance Comparison
+
+| Dataset Size  | Objecter      | AutoMapper               | class-transformer        |
+| ------------- | ------------- | ------------------------ | ------------------------ |
+| Single Object | **66.98 µs**  | 166.94 µs (2.49x slower) | 205.38 µs (3.07x slower) |
+| 1K Objects    | **155.32 ms** | 306.08 ms (1.97x slower) | 295.32 ms (1.90x slower) |
+| 10K Objects   | **312.33 ms** | 416.68 ms (1.33x slower) | 454.23 ms (1.45x slower) |
+| 100K Objects  | **501.98 ms** | 1.36 s (2.70x slower)    | 1.65 s (3.29x slower)    |
+| 1M Objects    | **2.38 s**    | 9.44 s (3.96x slower)    | 13.02 s (5.46x slower)   |
+
+### Results Highlights
+
+- **Up to 5.46x faster** than class-transformer on large datasets
+- **Up to 3.96x faster** than AutoMapper on large datasets
+- **Circular dependency checking** included with minimal performance impact
+- **Superior CPU efficiency** with optimized cache utilization (66-85% cache hit rate)
+- **Better IPC (Instructions Per Cycle)** ranging from 0.60 to 2.40 depending on workload
+
+### Technical Metrics
+
+For 1M objects transformation with circular dependency checks:
+
+- **Objecter**: 2.40 IPC, 22.16B instructions, 85.04% cache hit rate
+- **AutoMapper**: 2.25 IPC, 82.98B instructions, 98.63% cache hit rate
+- **class-transformer**: 2.20 IPC, 111.60B instructions, 98.67% cache hit rate
+
+Objecter achieves superior performance through dramatically fewer total instructions executed (80% reduction vs class-transformer) and optimized CPU utilization.
+
+---
+
+_Benchmark configuration: AMD Ryzen 5 5500U @ 1.40 GHz, Node.js 24.10.0, Ubuntu Linux_
+
+### How to Run Benchmarks
+
+You can run the benchmarks on your own machine using:
+
+```bash
+pnpm test:benchmark
+```
 
 ## Installation
 
+> **Note**: Currently, this package is only available via GitHub Packages.
+
 ```bash
 # npm
-npm install @mevaspace/objecter
+npm install @mevaspace/objecter --registry=https://npm.pkg.github.com
 
 # pnpm
-pnpm add @mevaspace/objecter
+pnpm add @mevaspace/objecter --registry=https://npm.pkg.github.com
 
 # yarn
-yarn add @mevaspace/objecter
+yarn add @mevaspace/objecter --registry=https://npm.pkg.github.com
 ```
 
 ## Usage
@@ -804,5 +853,5 @@ const omit = <T extends Record<string, any>>(keys: string[]): TransformFn => {
 ## Limitations
 
 1.  **Zero-Argument Constructor**: The target class **must** have a zero-argument constructor (or no constructor defined). Objecter instantiates the target using `new TargetClass()`.
-2.  **Circular References**: Objecter does **not** currently handle circular references (e.g., Parent -> Child -> Parent). Attempting to map circular structures will result in a stack overflow.
+2.  **Circular References**: Objecter does **not** currently handle circular references (e.g., Parent -> Child -> Parent). Attempting to map circular structures will throw a `Circular reference detected during deep clone` error.
 3.  **Prototype Safety**: `autoMap` iterates over properties defined in the target instance and its prototype chain to determine what to copy. Ensure your target classes are simple DTOs.

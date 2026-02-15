@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+
 import { bench, group, run, summary } from 'mitata';
 import { Objecter, FieldMapping } from '@mevaspace/objecter';
 import { plainToInstance } from 'class-transformer';
@@ -179,68 +180,93 @@ const users1M = generateUsers(1_000_000);
 // ─── Benchmarks ────────────────────────────────────────────
 
 summary(() => {
-  group('Single Object Mapping', () => {
-    const source = users1[0];
-    bench('Objecter', () => objecterMapper(source));
-    bench('class-transformer', () => ctTransform(source));
-    bench('AutoMapper', () => amTransform(source));
+  group('Single Object', () => {
+    bench('Objecter', function* (arg) {
+      yield () => objecterMapper(arg.get('source'));
+    })
+      .args('source', users1)
+      .gc('inner');
+
+    bench('class-transformer', function* (arg) {
+      yield () => ctTransform(arg.get('source'));
+    })
+      .args('source', users1)
+      .gc('inner');
+
+    bench('AutoMapper', function* (arg) {
+      yield () => amTransform(arg.get('source'));
+    })
+      .args('source', users1)
+      .gc('inner');
+  });
+
+  group('1K Object', () => {
+    bench('Objecter', function () {
+      const arg = users1K;
+      for (const x of arg) objecterMapper(x);
+    }).gc('inner');
+
+    bench('class-transformer', function () {
+      const arg = users1K;
+      for (const x of arg) ctTransform(x);
+    }).gc('inner');
+
+    bench('AutoMapper', function () {
+      const arg = users1K;
+      for (const x of arg) amTransform(x);
+    }).gc('inner');
+  });
+
+  group('10K Object', () => {
+    bench('Objecter', function () {
+      const arg = users10K;
+      for (const x of arg) objecterMapper(x);
+    }).gc('inner');
+
+    bench('class-transformer', function () {
+      const arg = users10K;
+      for (const x of arg) ctTransform(x);
+    }).gc('inner');
+
+    bench('AutoMapper', function () {
+      const arg = users10K;
+      for (const x of arg) amTransform(x);
+    }).gc('inner');
+  });
+
+  group('100K Object', () => {
+    bench('Objecter', function () {
+      const arg = users100K;
+      for (const x of arg) objecterMapper(x);
+    }).gc('inner');
+
+    bench('class-transformer', function () {
+      const arg = users100K;
+      for (const x of arg) ctTransform(x);
+    }).gc('inner');
+
+    bench('AutoMapper', function () {
+      const arg = users100K;
+      for (const x of arg) amTransform(x);
+    }).gc('inner');
+  });
+
+  group('1M Object', () => {
+    bench('Objecter', function () {
+      const arg = users1M;
+      for (const x of arg) objecterMapper(x);
+    }).gc('inner');
+
+    bench('class-transformer', function () {
+      const arg = users1M;
+      for (const x of arg) ctTransform(x);
+    }).gc('inner');
+
+    bench('AutoMapper', function () {
+      const arg = users1M;
+      for (const x of arg) amTransform(x);
+    }).gc('inner');
   });
 });
 
-summary(() => {
-  group('Array Mapping (1K)', () => {
-    bench('Objecter', () => {
-      for (let i = 0; i < 1_000; i++) objecterMapper(users1K[i]);
-    });
-    bench('class-transformer', () => {
-      for (let i = 0; i < 1_000; i++) ctTransform(users1K[i]);
-    });
-    bench('AutoMapper', () => {
-      for (let i = 0; i < 1_000; i++) amTransform(users1K[i]);
-    });
-  });
-});
-
-summary(() => {
-  group('Array Mapping (10K)', () => {
-    bench('Objecter', () => {
-      for (let i = 0; i < 10_000; i++) objecterMapper(users10K[i]);
-    });
-    bench('class-transformer', () => {
-      for (let i = 0; i < 10_000; i++) ctTransform(users10K[i]);
-    });
-    bench('AutoMapper', () => {
-      for (let i = 0; i < 10_000; i++) amTransform(users10K[i]);
-    });
-  });
-});
-
-summary(() => {
-  group('Array Mapping (100K)', () => {
-    bench('Objecter', () => {
-      for (let i = 0; i < 100_000; i++) objecterMapper(users100K[i]);
-    });
-    bench('class-transformer', () => {
-      for (let i = 0; i < 100_000; i++) ctTransform(users100K[i]);
-    });
-    bench('AutoMapper', () => {
-      for (let i = 0; i < 100_000; i++) amTransform(users100K[i]);
-    });
-  });
-});
-
-summary(() => {
-  group('Array Mapping (1M)', () => {
-    bench('Objecter', () => {
-      for (let i = 0; i < 1_000_000; i++) objecterMapper(users1M[i]);
-    });
-    bench('class-transformer', () => {
-      for (let i = 0; i < 1_000_000; i++) ctTransform(users1M[i]);
-    });
-    bench('AutoMapper', () => {
-      for (let i = 0; i < 1_000_000; i++) amTransform(users1M[i]);
-    });
-  });
-});
-
-void run();
+void run({ format: { mitata: { name: 'longest' } } });

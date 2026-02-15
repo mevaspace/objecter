@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/mevaspace/objecter/compare/v1.0.0...v1.1.0) (2026-02-15)
+
+
+### Features
+
+* improve performance, benchmark, and check circular deps ([b429110](https://github.com/mevaspace/objecter/commit/b4291100d10d97c80ee4de37ae5144c567957750))
+
 # 1.0.0 (2026-02-08)
 
 ### Features

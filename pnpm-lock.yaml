@@ -58,9 +58,6 @@ importers:
       '@automapper/core':
         specifier: ^8.8.1
         version: 8.8.1
-      '@mevaspace/objecter':
-        specifier: file://../dist
-        version: file:dist
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
@@ -104,6 +101,10 @@ importers:
       typescript-eslint:
         specifier: ^8.54.0
         version: 8.54.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
+    optionalDependencies:
+      '@mevaspace/objecter':
+        specifier: file://../dist
+        version: file:dist
 
   core:
     devDependencies:
@@ -5873,7 +5874,8 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@mevaspace/objecter@file:dist': {}
+  '@mevaspace/objecter@file:dist':
+    optional: true
 
   '@napi-rs/wasm-runtime@0.2.12':
     dependencies:

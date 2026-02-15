@@ -4,6 +4,7 @@
   "license": "MIT",
   "version": "1.0.0",
   "description": "A simple object manipulation library",
+  "packageManager": "pnpm@10.26.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/mevaspace/objecter.git"
@@ -29,6 +30,8 @@
     "format": "prettier --write --config .prettierrc.json .",
     "precz": "pnpm prepare",
     "preinstall": "pnpm dlx only-allow pnpm",
+    "pretest:benchmark": "pnpm build",
+    "test:benchmark": "pnpm --filter @mevaspace/objecter-benchmark test",
     "test:unit": "pnpm --filter @mevaspace/objecter-core test:unit",
     "test:cov": "pnpm --filter @mevaspace/objecter-core test:cov",
     "test:e2e": "pnpm --filter @mevaspace/objecter-core test:e2e",
@@ -37,7 +40,6 @@
     "release:dry": "semantic-release --dry-run",
     "prepare": "husky"
   },
-  "packageManager": "pnpm@10.26.1",
   "devDependencies": {
     "@commitlint/cli": "^20.4.1",
     "@commitlint/config-conventional": "^20.4.1",

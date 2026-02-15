@@ -1,6 +1,7 @@
 {
   "name": "@mevaspace/objecter-core",
   "scripts": {
+    "lintstaged:eslint": "eslint --fix",
     "lint": "eslint . --fix",
     "prebuild": "rimraf ../dist",
     "build": "tsup src/index.ts --format cjs,esm --dts --minify --clean",
@@ -9,7 +10,6 @@
     "test:cov": "jest -c test/jest.unit.config.json --coverage",
     "test:e2e": "jest -c test/jest.e2e.config.json"
   },
-  "packageManager": "pnpm@10.26.1",
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@types/jest": "^30.0.0",

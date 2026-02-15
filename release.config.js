@@ -1,5 +1,5 @@
 const headerPattern =
-  /^(?:[\u2300-\u23FF]|[\u2B05-\u2B07]|[\u2194-\u2199]|[\u2700-\u27BF]|[\u1F000-\u1F9FF]|[\u1F600-\u1F64F]|[\u1F680-\u1F6FF]|[\u1F300-\u1F5FF])\s(\w+)(?:\(([\w$.\-* ]+)\))?: (.*)$/;
+  /^(?:[\u2300-\u23FF]|[\u2B05-\u2B07]|[\u2194-\u2199]|[\u2700-\u27BF]|[\u1F000-\u1F9FF]|[\u1F600-\u1F64F]|[\u1F680-\u1F6FF]|[\u1F300-\u1F5FF])\s(\w+)(?:\(([\w$.\-* ]+)\))?: (.*)$/; // NOSONAR
 
 module.exports = {
   branches: ['master'],

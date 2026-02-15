@@ -28,9 +28,6 @@ jobs:
         with:
           node-version: 'lts/*'
 
-      # Using pnpm directly since version 10 is available via corepack or we can setup pnpm action
-      # But standard setup-node might not have pnpm enabled by default for latest versions or checks package.json
-      # Let's use the packageManager field in package.json to enable it via corepack
       - name: Enable Corepack
         run: corepack enable
 

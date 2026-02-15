@@ -1,0 +1,32 @@
+{
+  "name": "@mevaspace/objecter-core",
+  "scripts": {
+    "lint": "eslint . --fix",
+    "prebuild": "rimraf ../dist",
+    "build": "tsup src/index.ts --format cjs,esm --dts --minify --clean",
+    "postbuild": "ts-node ../scripts/copy-package.ts",
+    "test:unit": "jest -c test/jest.unit.config.json",
+    "test:cov": "jest -c test/jest.unit.config.json --coverage",
+    "test:e2e": "jest -c test/jest.e2e.config.json"
+  },
+  "packageManager": "pnpm@10.26.1",
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.2.1",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-unused-imports": "^4.3.0",
+    "globals": "^17.3.0",
+    "jest": "^30.2.0",
+    "jiti": "^2.6.1",
+    "rimraf": "^6.1.2",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0"
+  }
+}

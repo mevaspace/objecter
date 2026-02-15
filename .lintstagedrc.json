@@ -1,4 +1,5 @@
 {
-  "src/**/*.ts": ["eslint -c eslint.config.mts src"],
+  "core/src/**/*.ts": ["pnpm --filter @mevaspace/objecter-core lint"],
+  "benchmark/src/**/*.ts": ["pnpm --filter @mevaspace/objecter-benchmark lint"],
   "*": ["prettier --log-level=silent --write --config .prettierrc.json ."]
 }

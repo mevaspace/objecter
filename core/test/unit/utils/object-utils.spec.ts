@@ -67,4 +67,56 @@ describe('deepClone', () => {
     expect(cloned).toEqual(original);
     expect(cloned).not.toBe(original);
   });
+
+  it('should deep clone RegExp objects', () => {
+    const original = /abc/gi;
+    original.lastIndex = 2;
+    const cloned = deepClone(original);
+    expect(cloned).not.toBe(original);
+    expect(cloned.source).toBe('abc');
+    expect(cloned.flags).toBe('gi');
+    expect(cloned.lastIndex).toBe(2);
+  });
+
+  it('should preserve prototype for custom class instances', () => {
+    class Foo {
+      x = 10;
+      y = 20;
+    }
+    const original = new Foo();
+    original.x = 99;
+    const cloned = deepClone(original);
+    expect(cloned).not.toBe(original);
+    expect(cloned).toBeInstanceOf(Foo);
+    expect(cloned.x).toBe(99);
+    expect(cloned.y).toBe(20);
+  });
+
+  it('should block __proto__ pollution', () => {
+    const malicious = JSON.parse('{"__proto__":{"polluted":true}}');
+    const cloned = deepClone(malicious);
+    const clean = {} as Record<string, unknown>;
+    expect(clean['polluted']).toBeUndefined();
+    expect(cloned).not.toBe(malicious);
+  });
+
+  it('should throw on circular reference', () => {
+    const obj: Record<string, unknown> = { a: 1 };
+    obj['self'] = obj;
+    expect(() => deepClone(obj)).toThrow('Circular reference detected during deep clone');
+  });
+
+  it('should return function values as-is (by reference)', () => {
+    const fn = () => 42;
+    expect(deepClone(fn)).toBe(fn);
+  });
+
+  it('should deep clone deeply nested objects', () => {
+    const original = { a: { b: { c: { d: { e: 'deep' } } } } };
+    const cloned = deepClone(original);
+    expect(cloned).toEqual(original);
+    expect(cloned.a.b.c.d).not.toBe(original.a.b.c.d);
+    cloned.a.b.c.d.e = 'mutated';
+    expect(original.a.b.c.d.e).toBe('deep');
+  });
 });

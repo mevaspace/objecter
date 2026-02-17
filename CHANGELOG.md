@@ -1,3 +1,13 @@
+## [1.1.1](https://github.com/mevaspace/objecter/compare/v1.1.0...v1.1.1) (2026-02-17)
+
+
+### Bug Fixes
+
+* commit regex pattern ([e60d362](https://github.com/mevaspace/objecter/commit/e60d36202df162291e8fe818d6cc0b6fce966e00))
+* **release:** can not download distribution release ([caa3103](https://github.com/mevaspace/objecter/commit/caa31030cfad604ceb68d545d924dfc4b6159fcc))
+* **release:** specifiy release commit ([a674271](https://github.com/mevaspace/objecter/commit/a674271945b4c656103e440445bf559a49e064b9))
+* workflow script ([77c8dc6](https://github.com/mevaspace/objecter/commit/77c8dc61eaa21bf19c46444ef84d305cf7c394fd))
+
 # [1.1.0](https://github.com/mevaspace/objecter/compare/v1.0.0...v1.1.0) (2026-02-15)
 
 

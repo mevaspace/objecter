@@ -6,7 +6,17 @@ module.exports = {
   plugins: [
     [
       '@semantic-release/commit-analyzer',
-      { preset: 'angular', parserOpts: { headerPattern, headerCorrespondence: ['type', 'scope', 'subject'] } },
+      {
+        preset: 'angular',
+        releaseRules: [
+          { breaking: true, release: 'major' },
+          { type: 'feat', release: 'minor' },
+          { type: 'fix', release: 'patch' },
+          { type: 'perf', release: 'patch' },
+          { type: 'revert', release: 'patch' },
+        ],
+        parserOpts: { headerPattern, headerCorrespondence: ['type', 'scope', 'subject'] },
+      },
     ],
     [
       '@semantic-release/release-notes-generator',

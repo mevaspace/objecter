@@ -14,6 +14,9 @@ export type {
   MappingProfile,
 } from './types';
 
+// Export utils
+export { asTarget } from './utils';
+
 // Export main class and error classes
 export { Objecter, default } from './objecter';
 export { MappingError, ValidationError } from './errors';

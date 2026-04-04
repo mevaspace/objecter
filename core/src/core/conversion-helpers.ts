@@ -16,7 +16,7 @@ export function initializeConversion<TSource, TTarget>(
   validationErrors: Map<string, string[]> | undefined;
   mappedTargetProps: Set<string> | undefined;
 } {
-  const target = new targetClass();
+  const target = targetClass === (Object as unknown) ? ({} as TTarget) : new targetClass();
   const context: MappingContext = { source, targetType: targetClass, data: options.context };
 
   return { target, context, validationErrors: undefined, mappedTargetProps: undefined };
@@ -37,10 +37,12 @@ export function applyAutoMapping(
   }
 
   const sourceObj = source;
-  const targetKeys = new Set([
-    ...Object.getOwnPropertyNames(target),
-    ...Object.getOwnPropertyNames(targetClass.prototype),
-  ]);
+  let targetKeys: Set<string>;
+  if (targetClass === (Object as unknown)) {
+    targetKeys = new Set(Object.keys(sourceObj as object));
+  } else {
+    targetKeys = new Set([...Object.getOwnPropertyNames(target), ...Object.getOwnPropertyNames(targetClass.prototype)]);
+  }
 
   for (const key of targetKeys) {
     if (key === 'constructor') {

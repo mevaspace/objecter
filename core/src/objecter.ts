@@ -264,6 +264,14 @@ export class Objecter {
   public static toPlainObject<TSource>(source: TSource, mapping?: FieldMapping[]): Record<string, unknown> {
     return Converter.toPlainObject(source, mapping);
   }
+
+  /**
+   * Helper to use an interface or type as a target class for mapping.
+   * Enables type-safe conversion without requiring a concrete class.
+   */
+  public static asTarget<T>(): Constructor<T> {
+    return Object as unknown as Constructor<T>;
+  }
 }
 
 export default Objecter;

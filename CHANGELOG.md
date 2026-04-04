@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/mevaspace/objecter/compare/v1.1.1...v1.2.0) (2026-04-04)
+
+
+### Features
+
+* make convert to handle object from interface ([3d7cbeb](https://github.com/mevaspace/objecter/commit/3d7cbeb0d7fba53fa93d4714b185af8deb507482))
+
 ## [1.1.1](https://github.com/mevaspace/objecter/compare/v1.1.0...v1.1.1) (2026-02-17)
 
 

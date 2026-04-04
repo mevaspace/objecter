@@ -338,9 +338,28 @@ Convert class instances to plain JavaScript objects (stripping prototypes), or s
 const plainObj = Objecter.toPlainObject(userEntity, mapping);
 ```
 
-### 10. Global Configuration
+### 10. Mapping to Interfaces
 
-Set default options that apply to all conversions globally. Useful for reducing boilerplate.
+If you don't want to define a concrete class for your target and prefer to use an interface, you can use the `asTarget<T>()` helper. This provides full autocomplete and type safety while returning a plain object.
+
+```typescript
+import { Objecter, asTarget } from '@mevaspace/objecter';
+
+interface IUserTarget {
+  fullName: string;
+  age: number;
+}
+
+const mapping = [
+  { from: 'firstName', to: 'fullName' },
+  { from: 'birthYear', to: 'age' },
+];
+
+// Returns a plain object typed as IUserTarget
+const result = Objecter.convert(source, asTarget<IUserTarget>(), mapping);
+```
+
+### 11. Global Configuration
 
 ```typescript
 import { Objecter } from '@mevaspace/objecter';
@@ -359,7 +378,7 @@ const dto3 = Objecter.convert(source3, TargetDTO, mapping, { autoMap: false });
 Objecter.resetConfig();
 ```
 
-### 11. Mapping Profiles
+### 12. Mapping Profiles
 
 Register reusable mapping definitions by name. Profiles are validated at registration time.
 
@@ -392,7 +411,7 @@ Objecter.clearProfiles();
 
 > **Note**: If the profile name is not found, `Objecter.map()` throws a `MappingError`.
 
-### 12. Async Transform
+### 13. Async Transform
 
 Use async methods when your transform functions need to perform async operations (API calls, database lookups, file I/O).
 
@@ -429,7 +448,7 @@ Objecter.registerProfile({ name: 'UserWithRole', targetClass: UserWithRole, mapp
 const result = await Objecter.mapAsync<UserWithRole>(source, 'UserWithRole');
 ```
 
-### 13. Async Validation
+### 14. Async Validation
 
 Similar to async transforms, you can use async validators for checks that require database or API calls.
 

@@ -23,13 +23,13 @@ import {
 
 // ─── Objecter Setup ────────────────────────────────────────
 
-const addressMapping: FieldMapping[] = [{ from: 'city' }, { from: 'zip' }];
+const addressMapping: FieldMapping<unknown, ObjAddressDTO>[] = [{ from: 'city' }, { from: 'zip' }];
 
 const addressMapper = Objecter.createMapper<unknown, ObjAddressDTO>(ObjAddressDTO, addressMapping, {
   strictMapping: false,
 });
 
-const companyMapping: FieldMapping[] = [
+const companyMapping: FieldMapping<unknown, ObjCompanyDTO>[] = [
   { from: 'name' },
   { from: 'industry' },
   { from: 'address', transform: (v: unknown) => addressMapper(v as Record<string, unknown>) },
@@ -39,7 +39,7 @@ const companyMapper = Objecter.createMapper<unknown, ObjCompanyDTO>(ObjCompanyDT
   strictMapping: false,
 });
 
-const userMapping: FieldMapping[] = [
+const userMapping: FieldMapping<UserSource, ObjUserDTO>[] = [
   { from: 'id' },
   {
     from: 'firstName',

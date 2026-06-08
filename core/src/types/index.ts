@@ -12,4 +12,5 @@ export type { ValidationResult } from './validation-result.interface';
 export type { MappingContext } from './mapping-context.interface';
 export type { FieldMapping, SkipIfPredicate } from './field-mapping.interface';
 export type { MappingOptions, SchemaValidateFn, AsyncSchemaValidateFn } from './mapping-options.interface';
+export type { ExcludeFieldsOf } from './property-path.type';
 export type { MappingProfile } from './profile.interface';

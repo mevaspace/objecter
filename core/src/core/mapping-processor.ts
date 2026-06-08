@@ -2,12 +2,15 @@ import { MappingError, ValidationError } from '../errors';
 import { FieldMapping, MappingContext, MappingOptions } from '../types';
 import { getNestedValue, setNestedValue, normalizeValidator, normalizeAsyncValidator, deepClone } from '../utils';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RuntimeFieldMapping = FieldMapping<any, any>;
+
 /**
  * Handles missing or null values with defaultValue and optional logic
  */
 function handleMissingValue(
   value: unknown,
-  fieldMap: FieldMapping,
+  fieldMap: RuntimeFieldMapping,
   options: Required<MappingOptions>,
   source: unknown,
   context: MappingContext,
@@ -66,7 +69,7 @@ function accumulateErrors(
  */
 function runValidators(
   value: unknown,
-  fieldMap: FieldMapping,
+  fieldMap: RuntimeFieldMapping,
   context: MappingContext,
   validationErrors: Map<string, string[]> | undefined,
 ): Map<string, string[]> | undefined {
@@ -93,7 +96,7 @@ function runValidators(
  */
 async function runValidatorsAsync(
   value: unknown,
-  fieldMap: FieldMapping,
+  fieldMap: RuntimeFieldMapping,
   context: MappingContext,
   validationErrors: Map<string, string[]> | undefined,
 ): Promise<Map<string, string[]> | undefined> {
@@ -129,11 +132,13 @@ async function runValidatorsAsync(
 export function processFieldMapping(
   source: unknown,
   target: Record<string, unknown>,
-  fieldMap: FieldMapping,
+  fieldMap: RuntimeFieldMapping,
   context: MappingContext,
   options: Required<MappingOptions>,
   validationErrors: Map<string, string[]> | undefined,
 ): Map<string, string[]> | undefined {
+  if (fieldMap.exclude) return validationErrors;
+
   const { from, to = from, transform } = fieldMap;
 
   let value = getNestedValue(source, from);
@@ -163,11 +168,13 @@ export function processFieldMapping(
 export async function processFieldMappingAsync(
   source: unknown,
   target: Record<string, unknown>,
-  fieldMap: FieldMapping,
+  fieldMap: RuntimeFieldMapping,
   context: MappingContext,
   options: Required<MappingOptions>,
   validationErrors: Map<string, string[]> | undefined,
 ): Promise<Map<string, string[]> | undefined> {
+  if (fieldMap.exclude) return validationErrors;
+
   const { from, to = from, transform } = fieldMap;
 
   let value = getNestedValue(source, from);
@@ -195,7 +202,7 @@ export async function processFieldMappingAsync(
 /**
  * Wraps errors from field mapping with proper context
  */
-export function wrapMappingError(error: unknown, fieldMap: FieldMapping, source: unknown): never {
+export function wrapMappingError(error: unknown, fieldMap: RuntimeFieldMapping, source: unknown): never {
   if (error instanceof MappingError) {
     const newField = `${fieldMap.from}.${error.field}`;
     throw new MappingError(error.message.replace(error.field, newField), newField, error.sourceValue, error.errors);

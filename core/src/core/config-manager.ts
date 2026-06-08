@@ -13,12 +13,15 @@ export const DEFAULT_OPTIONS: Required<MappingOptions> = {
   checkCircular: true,
   validateSchema: null as unknown as SchemaValidateFn,
   validateSchemaAsync: null as unknown as AsyncSchemaValidateFn,
+  excludeFields: [],
+  excludePattern: null as unknown as string | RegExp,
 };
 
 /**
  * Global options that override defaults
  */
-let globalOptions: Partial<MappingOptions> = {};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let globalOptions: Partial<MappingOptions<any>> = {};
 
 /**
  * Configures global default options for all conversions
@@ -37,6 +40,7 @@ export function resetConfig(): void {
   globalOptions = {};
 }
 
-export function getMergedOptions(options?: MappingOptions): Required<MappingOptions> {
-  return { ...DEFAULT_OPTIONS, ...globalOptions, ...options };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getMergedOptions(options?: MappingOptions<any>): Required<MappingOptions> {
+  return { ...DEFAULT_OPTIONS, ...globalOptions, ...options } as Required<MappingOptions>;
 }

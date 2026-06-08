@@ -25,6 +25,17 @@ export function initializeConversion<TSource, TTarget>(
 /**
  * Applies AutoMap logic to copy matching properties
  */
+function buildExcludePattern(options: Required<MappingOptions>): RegExp | null {
+  if (!options.excludePattern) return null;
+  return typeof options.excludePattern === 'string' ? new RegExp(options.excludePattern) : options.excludePattern;
+}
+
+function isExcluded(key: string, excludeSet: Set<string> | null, excludeRe: RegExp | null): boolean {
+  if (excludeSet?.has(key)) return true;
+  if (excludeRe?.test(key)) return true;
+  return false;
+}
+
 export function applyAutoMapping(
   source: unknown,
   target: Record<string, unknown>,
@@ -44,11 +55,17 @@ export function applyAutoMapping(
     targetKeys = new Set([...Object.getOwnPropertyNames(target), ...Object.getOwnPropertyNames(targetClass.prototype)]);
   }
 
+  const excludeSet = options.excludeFields?.length ? new Set<string>(options.excludeFields as string[]) : null;
+  const excludeRe = buildExcludePattern(options);
+
   for (const key of targetKeys) {
     if (key === 'constructor') {
       continue;
     }
     if (mappedTargetProps?.has(key)) {
+      continue;
+    }
+    if (isExcluded(key, excludeSet, excludeRe)) {
       continue;
     }
 

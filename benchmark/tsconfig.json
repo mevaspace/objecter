@@ -7,7 +7,6 @@
 
     "incremental": true,
     "module": "commonjs",
-    "moduleResolution": "node",
     "target": "ES2024",
     "types": ["node"],
 

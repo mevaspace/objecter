@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lintstaged:eslint": "eslint --fix",
+    "lintstaged:lint": "oxlint --fix",
     "test": "tsx src/benchmark.ts",
-    "lint": "eslint . --fix"
+    "lint": "oxlint --fix"
   },
   "optionalDependencies": {
     "@mevaspace/objecter": "file://../dist"
@@ -19,16 +19,10 @@
     "reflect-metadata": "^0.1.14"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
-    "@types/node": "^25.2.1",
-    "eslint": "^9.0.0",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-import-resolver-typescript": "^4.4.4",
-    "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-unused-imports": "^4.3.0",
-    "globals": "^17.3.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.54.0"
+    "@types/node": "^25.9.2",
+    "oxlint": "^1.68.0",
+    "oxlint-tsgolint": "^0.22.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
   }
 }

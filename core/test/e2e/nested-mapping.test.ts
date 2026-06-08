@@ -60,6 +60,7 @@ describe('Feature 3: Nested Object Mapping', () => {
     });
 
     it('should handle sparse array without crashing', () => {
+      // oxlint-disable-next-line no-sparse-arrays -- sparse array fixture
       const sources = [{ fullName: 'A' }, , { fullName: 'B' }] as { fullName: string }[]; // NOSONAR
       const validSources = sources.filter((s): s is { fullName: string } => s !== undefined);
       const result = Objecter.convertArray(validSources, ItemDTO, [{ from: 'fullName' }], { strictMapping: false });

@@ -233,3 +233,13 @@ describe('Objecter.toPlainObject', () => {
     expect(result).toEqual({ name: 'John' });
   });
 });
+
+describe('Objecter.asTarget', () => {
+  it('should return Object as a typed mapping target', () => {
+    const result = Objecter.convert({ name: 'John' }, Objecter.asTarget<{ name: string }>(), [{ from: 'name' }], {
+      strictMapping: false,
+    });
+
+    expect(result).toEqual({ name: 'John' });
+  });
+});

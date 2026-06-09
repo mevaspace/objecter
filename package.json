@@ -47,7 +47,7 @@
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/npm": "^13.1.4",
-    "@types/node": "^25.9.2",
+    "@types/node": "catalog:",
     "commitizen": "^4.3.1",
     "commitlint": "^20.4.1",
     "cz-conventional-changelog": "^3.3.0",

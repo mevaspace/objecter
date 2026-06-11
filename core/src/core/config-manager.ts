@@ -13,6 +13,8 @@ export const DEFAULT_OPTIONS: Required<MappingOptions> = {
   checkCircular: true,
   validateSchema: null as unknown as SchemaValidateFn,
   validateSchemaAsync: null as unknown as AsyncSchemaValidateFn,
+  excludeFields: [],
+  excludePattern: null as unknown as string | RegExp,
 };
 
 /**
@@ -38,5 +40,5 @@ export function resetConfig(): void {
 }
 
 export function getMergedOptions(options?: MappingOptions): Required<MappingOptions> {
-  return { ...DEFAULT_OPTIONS, ...globalOptions, ...options };
+  return { ...DEFAULT_OPTIONS, ...globalOptions, ...options } as Required<MappingOptions>;
 }

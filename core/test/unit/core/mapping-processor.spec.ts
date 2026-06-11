@@ -65,7 +65,7 @@ describe('processFieldMapping', () => {
     processFieldMapping(
       { name: null },
       target,
-      { from: 'name', defaultValue: 'default' as any },
+      { from: 'name', defaultValue: 'default' },
       createContext({ name: null }),
       baseOptions,
       errors,
@@ -76,14 +76,7 @@ describe('processFieldMapping', () => {
   it('should use defaultValue when source is undefined', () => {
     const target: Record<string, unknown> = {};
     const errors = new Map<string, string[]>();
-    processFieldMapping(
-      {},
-      target,
-      { from: 'name', defaultValue: 'N/A' as any },
-      createContext({}),
-      baseOptions,
-      errors,
-    );
+    processFieldMapping({}, target, { from: 'name', defaultValue: 'N/A' }, createContext({}), baseOptions, errors);
     expect(target.name).toBe('N/A');
   });
 

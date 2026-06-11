@@ -6,7 +6,7 @@ const ARRAY_INDEX_REGEX = /^(\w+)\[(\d+)\]$/;
 /**
  * Set of forbidden keys to prevent prototype pollution
  */
-const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+export const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /**
  * Parsed segment representing a single key in a dot-notation path
@@ -42,13 +42,15 @@ function getPathSegments(path: string): ParsedSegment[] {
   let segments = pathCache.get(path);
   if (!segments) {
     if (pathCache.size >= 1000) {
-      pathCache.clear();
+      // Evict the oldest entry (Map preserves insertion order) instead of
+      // clearing the whole cache, which would cause a GC spike under churn
+      const oldest = pathCache.keys().next().value;
+      if (oldest !== undefined) {
+        pathCache.delete(oldest);
+      }
     }
     const parts = path.split('.');
-    segments = new Array<ParsedSegment>(parts.length);
-    for (let i = 0; i < parts.length; i++) {
-      segments[i] = parseSegment(parts[i]);
-    }
+    segments = parts.map((part) => parseSegment(part));
     pathCache.set(path, segments);
   }
   return segments;
@@ -76,6 +78,11 @@ export function getNestedValue(obj: unknown, path: string): unknown {
     }
 
     const seg = element;
+    // Block reads through prototype-pollution vectors: paths like
+    // 'constructor.prototype' or '__proto__' must behave as missing fields
+    if (FORBIDDEN_KEYS.has(seg.isArray ? seg.arrayKey : seg.raw)) {
+      return undefined;
+    }
     if (seg.isArray) {
       const arr = (current as Record<string, unknown>)[seg.arrayKey];
       if (!Array.isArray(arr)) {

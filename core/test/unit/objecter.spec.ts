@@ -162,7 +162,7 @@ describe('Objecter.createMapper', () => {
       [
         {
           from: 'name',
-          transform: (_v, _s, ctx) => {
+          transform: (_v: unknown, _s, ctx) => {
             if (ctx) capturedContext = ctx.data as Record<string, unknown>;
             return _v;
           },
@@ -193,7 +193,7 @@ describe('Objecter.createArrayMapper', () => {
       [
         {
           from: 'name',
-          transform: (_v, _s, ctx) => {
+          transform: (_v: unknown, _s, ctx) => {
             if (ctx) capturedContext = ctx.data as Record<string, unknown>;
             return _v;
           },
@@ -230,6 +230,16 @@ describe('Objecter.toPlainObject', () => {
 
   it('should convert to plain object with mapping', () => {
     const result = Objecter.toPlainObject({ firstName: 'John' }, [{ from: 'firstName', to: 'name' }]);
+    expect(result).toEqual({ name: 'John' });
+  });
+});
+
+describe('Objecter.asTarget', () => {
+  it('should return Object as a typed mapping target', () => {
+    const result = Objecter.convert({ name: 'John' }, Objecter.asTarget<{ name: string }>(), [{ from: 'name' }], {
+      strictMapping: false,
+    });
+
     expect(result).toEqual({ name: 'John' });
   });
 });

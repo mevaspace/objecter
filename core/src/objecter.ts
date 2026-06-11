@@ -98,11 +98,11 @@ export class Objecter {
   public static convert<TSource, TTarget>(
     source: TSource,
     targetClass: Constructor<TTarget>,
-    mapping: FieldMapping[],
-    options?: MappingOptions,
+    mapping: FieldMapping<TSource, TTarget>[],
+    options?: MappingOptions<TSource>,
   ): TTarget {
     const mergedOptions = ConfigManager.getMergedOptions(options);
-    return Converter.convert(source, targetClass, mapping, mergedOptions);
+    return Converter.convert(source, targetClass, mapping as FieldMapping[], mergedOptions);
   }
 
   /**
@@ -119,11 +119,11 @@ export class Objecter {
   public static async convertAsync<TSource, TTarget>(
     source: TSource,
     targetClass: Constructor<TTarget>,
-    mapping: FieldMapping[],
-    options?: MappingOptions,
+    mapping: FieldMapping<TSource, TTarget>[],
+    options?: MappingOptions<TSource>,
   ): Promise<TTarget> {
     const mergedOptions = ConfigManager.getMergedOptions(options);
-    return Converter.convertAsync(source, targetClass, mapping, mergedOptions);
+    return Converter.convertAsync(source, targetClass, mapping as FieldMapping[], mergedOptions);
   }
 
   /**
@@ -138,11 +138,11 @@ export class Objecter {
   public static convertArray<TSource, TTarget>(
     sources: TSource[],
     targetClass: Constructor<TTarget>,
-    mapping: FieldMapping[],
-    options?: MappingOptions,
+    mapping: FieldMapping<TSource, TTarget>[],
+    options?: MappingOptions<TSource>,
   ): TTarget[] {
     const mergedOptions = ConfigManager.getMergedOptions(options);
-    return Converter.convertArray(sources, targetClass, mapping, mergedOptions);
+    return Converter.convertArray(sources, targetClass, mapping as FieldMapping[], mergedOptions);
   }
 
   /**
@@ -157,11 +157,11 @@ export class Objecter {
   public static async convertArrayAsync<TSource, TTarget>(
     sources: TSource[],
     targetClass: Constructor<TTarget>,
-    mapping: FieldMapping[],
-    options?: MappingOptions,
+    mapping: FieldMapping<TSource, TTarget>[],
+    options?: MappingOptions<TSource>,
   ): Promise<TTarget[]> {
     const mergedOptions = ConfigManager.getMergedOptions(options);
-    return Converter.convertArrayAsync(sources, targetClass, mapping, mergedOptions);
+    return Converter.convertArrayAsync(sources, targetClass, mapping as FieldMapping[], mergedOptions);
   }
 
   /**
@@ -177,11 +177,11 @@ export class Objecter {
   public static convertArrayGenerator<TSource, TTarget>(
     sources: TSource[],
     targetClass: Constructor<TTarget>,
-    mapping: FieldMapping[],
-    options?: MappingOptions,
+    mapping: FieldMapping<TSource, TTarget>[],
+    options?: MappingOptions<TSource>,
   ): Generator<TTarget> {
     const mergedOptions = ConfigManager.getMergedOptions(options);
-    return Converter.convertArrayGenerator(sources, targetClass, mapping, mergedOptions);
+    return Converter.convertArrayGenerator(sources, targetClass, mapping as FieldMapping[], mergedOptions);
   }
 
   /**
@@ -194,10 +194,10 @@ export class Objecter {
    */
   public static createMapper<TSource, TTarget>(
     targetClass: Constructor<TTarget>,
-    mapping: FieldMapping[],
-    options?: MappingOptions,
+    mapping: FieldMapping<TSource, TTarget>[],
+    options?: MappingOptions<TSource>,
   ): (source: TSource, _parent?: unknown, context?: MappingContext) => TTarget {
-    ProfileRegistry.validateMappingConfig(mapping);
+    ProfileRegistry.validateMappingConfig(mapping as FieldMapping[]);
 
     return (source: TSource, _parent?: unknown, context?: MappingContext) => {
       // Merge with global options at runtime
@@ -206,7 +206,7 @@ export class Objecter {
       if (context?.data) {
         mergedOptions.context = { ...mergedOptions.context, ...context.data };
       }
-      return Converter.convert(source, targetClass, mapping, mergedOptions);
+      return Converter.convert(source, targetClass, mapping as FieldMapping[], mergedOptions);
     };
   }
 
@@ -220,17 +220,17 @@ export class Objecter {
    */
   public static createArrayMapper<TSource, TTarget>(
     targetClass: Constructor<TTarget>,
-    mapping: FieldMapping[],
-    options?: MappingOptions,
+    mapping: FieldMapping<TSource, TTarget>[],
+    options?: MappingOptions<TSource>,
   ): (sources: TSource[], _parent?: unknown, context?: MappingContext) => TTarget[] {
-    ProfileRegistry.validateMappingConfig(mapping);
+    ProfileRegistry.validateMappingConfig(mapping as FieldMapping[]);
 
     return (sources: TSource[], _parent?: unknown, context?: MappingContext) => {
       const mergedOptions = ConfigManager.getMergedOptions(options);
       if (context?.data) {
         mergedOptions.context = { ...mergedOptions.context, ...context.data };
       }
-      return Converter.convertArray(sources, targetClass, mapping, mergedOptions);
+      return Converter.convertArray(sources, targetClass, mapping as FieldMapping[], mergedOptions);
     };
   }
 

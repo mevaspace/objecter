@@ -9,13 +9,9 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
  * Deep clones a value to prevent mutation of source objects.
  * Internalized klona/lite algorithm for ~10x faster performance vs structuredClone.
  * Supports: plain objects, custom class instances, arrays, Date, RegExp.
- * Circular references are detected and will throw an error.
- */
-/**
- * Deep clones a value to prevent mutation of source objects.
- * Internalized klona/lite algorithm for ~10x faster performance vs structuredClone.
- * Supports: plain objects, custom class instances, arrays, Date, RegExp.
- * Circular references are detected if checkCircular is true.
+ * Circular references are detected (and throw) only if checkCircular is true;
+ * callers passing untrusted object graphs must keep checkCircular enabled,
+ * otherwise a cycle overflows the call stack.
  */
 export function deepClone<T>(value: T, checkCircular = false): T {
   return cloneValue(value, checkCircular ? new WeakSet() : undefined);
@@ -31,7 +27,7 @@ function markSeen(obj: object, seen: WeakSet<object> | undefined): void {
 
 function cloneArray(src: unknown[], seen: WeakSet<object> | undefined): unknown[] {
   const len = src.length;
-  const out = new Array(len);
+  const out = Array.from<unknown>({ length: len });
   for (let i = len; i--; ) {
     out[i] = cloneValue(src[i], seen);
   }
@@ -47,6 +43,11 @@ function cloneRegExp(re: RegExp): RegExp {
 function cloneCustomClass(src: Record<string, unknown>, seen: WeakSet<object> | undefined): Record<string, unknown> {
   const out = new (src.constructor as new () => Record<string, unknown>)();
   for (const k in src) {
+    // An own enumerable '__proto__' key would mutate the clone's prototype
+    // through plain assignment, so it is never copied
+    if (k === '__proto__') {
+      continue;
+    }
     if (Object.prototype.hasOwnProperty.call(src, k) && out[k] !== src[k]) {
       out[k] = cloneValue(src[k], seen);
     }
@@ -86,7 +87,7 @@ function cloneValue<T>(x: T, seen: WeakSet<object> | undefined): T {
   const obj = x as object;
   markSeen(obj, seen);
 
-  const tag = Object.prototype.toString.call(obj);
+  const tag = Object.prototype.toString.call(obj) as string;
 
   if (tag === '[object Array]') return cloneArray(obj as unknown[], seen) as T;
   if (tag === '[object Date]') return new Date(+(obj as Date)) as T;

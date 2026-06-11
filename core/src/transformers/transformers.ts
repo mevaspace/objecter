@@ -81,15 +81,21 @@ export const Transformers = {
 
   /**
    * Safely parses JSON string
+   * @param maxLength - Optional upper bound on input length; longer strings throw
    */
   parseJSON:
-    <T>(): TransformFn<string, T> =>
+    <T>(maxLength?: number): TransformFn<string, T> =>
     (value) => {
       if (typeof value !== 'string') return value as T;
+      if (maxLength !== undefined && value.length > maxLength) {
+        throw new SyntaxError(`JSON string length ${value.length} exceeds maximum of ${maxLength}`);
+      }
       try {
         return JSON.parse(value) as T;
       } catch {
-        throw new SyntaxError(`Invalid JSON: ${value}`);
+        // Truncate to avoid echoing large untrusted payloads into error logs
+        const shown = value.length > 100 ? `${value.slice(0, 100)}...` : value;
+        throw new SyntaxError(`Invalid JSON: ${shown}`);
       }
     },
 

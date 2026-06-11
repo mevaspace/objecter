@@ -6,18 +6,18 @@ Influenced by [MapStruct](https://mapstruct.org/) (Java), Objecter provides a fu
 
 ## Status
 
-- **Version**: 0.0.1-dev
+- **Version**: 1.2.0
 - **Package**: `@mevaspace/objecter`
 - **License**: MIT
 
 ## Why Objecter?
 
-- **Zero Decorators**: Keep your domain entities clean. No need to add `@Expose` or `@Map` decorators to your business objects.
-- **Type Safety**: Built with TypeScript in mind.
-- **Functional Composition**: Use simple functions for transformations and validations.
-- **Flexible**: Specific mappings where you need them, auto-mapping where you don't.
+- **Zero Decorators**: Keep your domain entities clean. No `@Expose` or `@Map` on your business objects.
+- **Type Safety**: Built with TypeScript in mind — paths, fields, and options are type-checked.
+- **Functional Composition**: Plain functions for transforms and validations — no magic.
+- **Flexible**: Explicit mappings where you need them, auto-mapping where you don't.
 - **Zero Runtime Dependencies**: Lightweight and focused.
-- **Faster than Popular Packages**: See benchmarks for more details.
+- **Faster than Popular Packages**: See benchmarks below.
 
 ## Benchmarks
 
@@ -28,48 +28,38 @@ Objecter significantly outperforms other popular object mapping libraries across
 ### Performance Comparison
 
 | Dataset Size  | Objecter      | AutoMapper               | class-transformer        |
-| ------------- | ------------- | ------------------------ | ------------------------ |
+| :------------ | :------------ | :----------------------- | :----------------------- |
 | Single Object | **66.98 µs**  | 166.94 µs (2.49x slower) | 205.38 µs (3.07x slower) |
 | 1K Objects    | **155.32 ms** | 306.08 ms (1.97x slower) | 295.32 ms (1.90x slower) |
 | 10K Objects   | **312.33 ms** | 416.68 ms (1.33x slower) | 454.23 ms (1.45x slower) |
 | 100K Objects  | **501.98 ms** | 1.36 s (2.70x slower)    | 1.65 s (3.29x slower)    |
 | 1M Objects    | **2.38 s**    | 9.44 s (3.96x slower)    | 13.02 s (5.46x slower)   |
 
-### Results Highlights
-
 - **Up to 5.46x faster** than class-transformer on large datasets
 - **Up to 3.96x faster** than AutoMapper on large datasets
 - **Circular dependency checking** included with minimal performance impact
-- **Superior CPU efficiency** with optimized cache utilization (66-85% cache hit rate)
-- **Better IPC (Instructions Per Cycle)** ranging from 0.60 to 2.40 depending on workload
 
-### Technical Metrics
+### Technical Metrics (1M objects, circular check enabled)
 
-For 1M objects transformation with circular dependency checks:
+| Library           | IPC  | Instructions | Cache Hit |
+| :---------------- | :--- | :----------- | :-------- |
+| Objecter          | 2.40 | 22.16B       | 85.04%    |
+| AutoMapper        | 2.25 | 82.98B       | 98.63%    |
+| class-transformer | 2.20 | 111.60B      | 98.67%    |
 
-- **Objecter**: 2.40 IPC, 22.16B instructions, 85.04% cache hit rate
-- **AutoMapper**: 2.25 IPC, 82.98B instructions, 98.63% cache hit rate
-- **class-transformer**: 2.20 IPC, 111.60B instructions, 98.67% cache hit rate
-
-Objecter achieves superior performance through dramatically fewer total instructions executed (80% reduction vs class-transformer) and optimized CPU utilization.
-
----
+Objecter achieves superior performance through dramatically fewer total instructions (80% reduction vs class-transformer) and optimized CPU utilization.
 
 _Benchmark configuration: AMD Ryzen 5 5500U @ 1.40 GHz, Node.js 24.10.0, Ubuntu Linux_
-
-### How to Run Benchmarks
-
-You can run the benchmarks on your own machine using:
 
 ```bash
 pnpm test:benchmark
 ```
 
+---
+
 ## Installation
 
-> **Note**: Currently, this package is only available via GitHub Release Assets.
->
-> Replace `v<version>` with the version you want to install (e.g., `v1.1.0`).
+> **Note**: Currently only available via GitHub Release Assets.
 
 ```bash
 # npm
@@ -82,11 +72,11 @@ pnpm add https://github.com/mevaspace/objecter/releases/download/v<version>/obje
 yarn add https://github.com/mevaspace/objecter/releases/download/v<version>/objecter.tar.gz
 ```
 
+---
+
 ## Usage
 
 ### 1. Basic Conversion
-
-Define your source and target classes, then define the mapping.
 
 ```typescript
 import { Objecter } from '@mevaspace/objecter';
@@ -110,73 +100,37 @@ user.firstName = 'John';
 user.lastName = 'Doe';
 user.email = 'john@example.com';
 
-const mapping = [
-  { from: 'id', to: 'id' },
-  { from: 'email', to: 'email' },
-  {
-    from: 'firstName', // Source field is required for looking up context, but we can transform
-    to: 'fullName',
-    transform: (_, source: UserEntity) => `${source.firstName} ${source.lastName}`,
-  },
-];
-
-const userDto = Objecter.convert(user, UserDTO, mapping);
-console.log(userDto);
-// Output: UserDTO { id: 1, email: 'john@example.com', fullName: 'John Doe' }
+const userDto = Objecter.convert(user, UserDTO, [
+  { from: 'id' },
+  { from: 'email' },
+  { from: 'firstName', to: 'fullName', transform: (_, source: UserEntity) => `${source.firstName} ${source.lastName}` },
+]);
+// UserDTO { id: 1, email: 'john@example.com', fullName: 'John Doe' }
 ```
 
 ### 2. Validation and Transformation
 
-Use built-in validators and transformers to sanitize and check data during conversion. The `validate` property accepts three types of validators:
+The `validate` property accepts three forms:
 
-1. **Predicate function** `(value) => boolean` - simple function that returns true/false
-2. **ValidateFn** `(value, fieldName, context) => { valid: boolean, errors?: string[] }` - detailed validation result
-3. **Zod schema** - any object with `safeParse` method (Zod compatible)
+- **Predicate** `(value) => boolean`
+- **ValidateFn** `(value, fieldName, context) => { valid: boolean, errors?: string[] }`
+- **Zod schema** — any object with a `safeParse` method
 
 ```typescript
 import { Objecter, Validators, Transformers } from '@mevaspace/objecter';
-import { z } from 'zod'; // Optional: if using Zod
+import { z } from 'zod'; // optional
 
 const mapping = [
-  {
-    from: 'email',
-    to: 'email',
-    transform: Transformers.trim(),
-    // Using built-in validator
-    validate: Validators.pattern(/^.+@.+\..+$/),
-  },
-  {
-    from: 'age',
-    to: 'age',
-    transform: Transformers.toNumber(),
-    // Using predicate function
-    validate: (age: number) => age >= 18 && age <= 100,
-  },
-  {
-    from: 'username',
-    to: 'username',
-    // Using Zod schema (if zod is installed)
-    validate: z.string().min(3).max(20),
-  },
+  { from: 'email', transform: Transformers.trim(), validate: Validators.pattern(/^.+@.+\..+$/) },
+  { from: 'age', transform: Transformers.toNumber(), validate: (age: number) => age >= 18 && age <= 100 },
+  { from: 'username', validate: z.string().min(3).max(20) },
 ];
 ```
 
 ### 3. Nested Objects
 
-Map complex nested structures using composable mappers.
-
 ```typescript
 import { Objecter } from '@mevaspace/objecter';
-
-class AddressEntity {
-  street: string;
-  city: string;
-}
-
-class UserEntity {
-  id: number;
-  address: AddressEntity;
-}
 
 class AddressDTO {
   streetAddress: string;
@@ -188,159 +142,101 @@ class UserDTO {
   location: AddressDTO;
 }
 
-// Create a reusable mapper for the nested object
 const addressMapper = Objecter.createMapper(AddressDTO, [
   { from: 'street', to: 'streetAddress' },
   { from: 'city', to: 'cityName' },
 ]);
 
-const mapping = [
-  { from: 'id', to: 'id' },
-  {
-    from: 'address',
-    to: 'location',
-    // Use the created mapper as a transformer
-    transform: addressMapper,
-  },
-];
-
-const userDto = Objecter.convert(userEntity, UserDTO, mapping);
+const userDto = Objecter.convert(userEntity, UserDTO, [
+  { from: 'id' },
+  { from: 'address', to: 'location', transform: addressMapper },
+]);
 ```
 
 ### 4. Reusable Mappers
 
-Create a compiled mapper function for better performance and reuse.
-
 ```typescript
-// Create once
+// Create once, use everywhere
 const userMapper = Objecter.createMapper(UserDTO, mapping);
-
-// Use everywhere
 const dto1 = userMapper(user1);
 const dto2 = userMapper(user2);
 
-// Or for arrays
+// Array mapper
 const userListMapper = Objecter.createArrayMapper(UserDTO, mapping);
 const dtoList = userListMapper(users);
 ```
 
 ### 5. Auto Mapping
 
-If your source and target share many property names, you can enable `autoMap` to automatically copy matching fields that aren't explicitly mapped.
+Enable `autoMap` to automatically copy properties with matching names that aren't explicitly mapped.
 
 ```typescript
 const dto = Objecter.convert(
   entity,
   Dto,
-  [
-    // Only map the fields that are DIFFERENT or require transformation
-    { from: 'db_id', to: 'id' },
-  ],
+  [{ from: 'db_id', to: 'id' }], // only fields that differ
   { autoMap: true },
 );
 ```
 
 ### 6. Conditional Mapping with Predicates
 
-Use `skipIf` to conditionally skip field mapping based on custom logic. This is more flexible than `skipIfNull` as it allows you to define any condition.
+Use `skipIf` to conditionally skip field mapping based on any custom logic.
 
 ```typescript
-import { Objecter, type SkipIfPredicate } from '@mevaspace/objecter';
-
-class UserEntity {
-  name: string;
-  email: string;
-  role: string;
-  internalNotes?: string;
-}
-
-class UserDTO {
-  name: string;
-  email?: string;
-  internalNotes?: string;
-}
-
-// Skip email for admin users
-const skipEmailForAdmin: SkipIfPredicate = (_value, source: any) => {
-  return source.role === 'admin';
-};
-
-// Skip internal notes based on context
-const skipInternalNotes: SkipIfPredicate = (_value, _source, context) => {
-  return context.data?.publicView === true;
-};
+import { Objecter } from '@mevaspace/objecter';
 
 const mapping = [
-  { from: 'name', to: 'name' },
-  { from: 'email', to: 'email', skipIf: skipEmailForAdmin },
-  { from: 'internalNotes', to: 'internalNotes', skipIf: skipInternalNotes },
+  { from: 'name' },
+  { from: 'email', skipIf: (_value, source: any) => source.role === 'admin' },
+  { from: 'internalNotes', skipIf: (_value, _source, context) => context.data?.publicView === true },
 ];
 
 const dto = Objecter.convert(user, UserDTO, mapping, { context: { publicView: true } });
 ```
 
-### 7. Schema-Level Validation
-
-Use `validateSchema` option to validate the entire target object after all field mappings are complete. This is useful for business rules that depend on multiple fields.
+Use `skipIfNull` as shorthand to skip when the source value is `null` or `undefined`:
 
 ```typescript
-import { Objecter, type SchemaValidateFn } from '@mevaspace/objecter';
+{ from: 'nickname', skipIfNull: true }
+```
 
-class RegistrationDTO {
-  username: string;
-  internalCode: string;
-  confirmCode: string;
-  age: number;
-}
+### 7. Schema-Level Validation
 
-// Validate code match and age requirement
-const validateRegistration: SchemaValidateFn = (target: any) => {
-  const errors: string[] = [];
+Validate the entire target object after all field mappings are applied. Useful for rules that span multiple fields.
 
-  if (target.internalCode !== target.confirmCode) {
-    errors.push('Code and confirm code must match');
-  }
+```typescript
+import { Objecter } from '@mevaspace/objecter';
 
-  if (target.age < 18) {
-    errors.push('User must be at least 18 years old');
-  }
-
-  return errors.length > 0 ? { valid: false, errors } : { valid: true };
-};
-
-const mapping = [
-  { from: 'username', to: 'username' },
-  { from: 'internalCode', to: 'internalCode' },
-  { from: 'confirmCode', to: 'confirmCode' },
-  { from: 'age', to: 'age' },
-];
-
-try {
-  const dto = Objecter.convert(source, RegistrationDTO, mapping, { validateSchema: validateRegistration });
-} catch (error) {
-  // ValidationError: Schema validation failed: Code and confirm code must match
-}
+const dto = Objecter.convert(source, RegistrationDTO, mapping, {
+  validateSchema: (target: any) => {
+    const errors: string[] = [];
+    if (target.password !== target.confirmPassword) errors.push('Passwords do not match');
+    if (target.age < 18) errors.push('Must be at least 18 years old');
+    return errors.length ? { valid: false, errors } : { valid: true };
+  },
+});
 ```
 
 ### 8. Merging Objects
 
-Merge multiple source objects into a single target instance. Later sources override earlier ones.
+Merge multiple source objects into one target. Later sources override earlier ones.
 
 ```typescript
-const mergedDto = Objecter.merge([source1, source2], TargetDTO, mapping);
+const merged = Objecter.merge([source1, source2], TargetDTO, mapping);
 ```
 
 ### 9. Plain Objects
 
-Convert class instances to plain JavaScript objects (stripping prototypes), or simply pick/transform fields from an object.
+Strip the class prototype and return a plain object.
 
 ```typescript
-const plainObj = Objecter.toPlainObject(userEntity, mapping);
+const plain = Objecter.toPlainObject(userEntity, mapping);
 ```
 
 ### 10. Mapping to Interfaces
 
-If you don't want to define a concrete class for your target and prefer to use an interface, you can use the `asTarget<T>()` helper. This provides full autocomplete and type safety while returning a plain object.
+Use `asTarget<T>()` (or `Objecter.asTarget<T>()`) to map to an interface without defining a concrete class.
 
 ```typescript
 import { Objecter, asTarget } from '@mevaspace/objecter';
@@ -350,13 +246,18 @@ interface IUserTarget {
   age: number;
 }
 
-const mapping = [
+// Standalone import form
+const result = Objecter.convert(source, asTarget<IUserTarget>(), [
   { from: 'firstName', to: 'fullName' },
   { from: 'birthYear', to: 'age' },
-];
+]);
 
-// Returns a plain object typed as IUserTarget
-const result = Objecter.convert(source, asTarget<IUserTarget>(), mapping);
+// Equivalent static method form
+const result2 = Objecter.convert(source, Objecter.asTarget<IUserTarget>(), [
+  { from: 'firstName', to: 'fullName' },
+  { from: 'birthYear', to: 'age' },
+]);
+// Both return a plain object typed as IUserTarget
 ```
 
 ### 11. Global Configuration
@@ -364,515 +265,308 @@ const result = Objecter.convert(source, asTarget<IUserTarget>(), mapping);
 ```typescript
 import { Objecter } from '@mevaspace/objecter';
 
-// Set global defaults
 Objecter.configure({ autoMap: true, throwOnValidationError: false });
 
-// All subsequent conversions use these defaults
 const dto1 = Objecter.convert(source1, TargetDTO, mapping);
 const dto2 = Objecter.convert(source2, TargetDTO, mapping);
 
-// Per-call options still override global config
+// Per-call options override global config
 const dto3 = Objecter.convert(source3, TargetDTO, mapping, { autoMap: false });
 
-// Reset to library defaults
-Objecter.resetConfig();
+Objecter.resetConfig(); // back to library defaults
 ```
 
 ### 12. Mapping Profiles
 
-Register reusable mapping definitions by name. Profiles are validated at registration time.
+Register named, reusable mapping definitions validated at registration time.
 
 ```typescript
 import { Objecter, type MappingProfile } from '@mevaspace/objecter';
 
-// Register a profile
 const userProfile = Objecter.registerProfile({
   name: 'UserToDto',
   targetClass: UserDTO,
-  mapping: [
-    { from: 'id', to: 'id' },
-    { from: 'name', to: 'name' },
-  ],
+  mapping: [{ from: 'id' }, { from: 'name' }],
   options: { autoMap: true },
 });
 
-// Use by profile name
 const dto = Objecter.map<UserDTO>(user, 'UserToDto');
 
-// Type-safe name usage (using returned profile)
-const dto2 = Objecter.map<UserDTO>(user, userProfile.name);
-
 // Override profile options per-call
-const dto3 = Objecter.map<UserDTO>(user, 'UserToDto', { autoMap: false });
+const dto2 = Objecter.map<UserDTO>(user, 'UserToDto', { autoMap: false });
 
-// Clear all registered profiles
 Objecter.clearProfiles();
 ```
 
-> **Note**: If the profile name is not found, `Objecter.map()` throws a `MappingError`.
+> If the profile name is not found, `Objecter.map()` throws a `MappingError`.
 
-### 13. Async Transform
+### 13. Async Transforms
 
-Use async methods when your transform functions need to perform async operations (API calls, database lookups, file I/O).
+Use async methods when any transform needs to perform async operations (API calls, DB lookups).
 
 ```typescript
-import { Objecter, FieldMapping } from '@mevaspace/objecter';
+import { Objecter, type FieldMapping } from '@mevaspace/objecter';
 
-class UserWithRole {
-  id: number;
-  name: string;
-  role: string;
-}
-
-// Async transform untuk API call
 const fetchRole = async (userId: number): Promise<string> => {
-  const response = await fetch(`/api/roles/${userId}`);
-  const data = await response.json();
-  return data.role;
+  const res = await fetch(`/api/roles/${userId}`);
+  return (await res.json()).role;
 };
 
-const mapping: FieldMapping[] = [
-  { from: 'id', to: 'id' },
-  { from: 'name', to: 'name' },
-  { from: 'id', to: 'role', transform: fetchRole },
-];
+const mapping: FieldMapping[] = [{ from: 'id' }, { from: 'name' }, { from: 'id', to: 'role', transform: fetchRole }];
 
-// Single object conversion
 const user = await Objecter.convertAsync(source, UserWithRole, mapping);
-
-// Array conversion
 const users = await Objecter.convertArrayAsync(sources, UserWithRole, mapping);
 
-// Profile-based async mapping
+// Profile-based
 Objecter.registerProfile({ name: 'UserWithRole', targetClass: UserWithRole, mapping });
 const result = await Objecter.mapAsync<UserWithRole>(source, 'UserWithRole');
 ```
 
-### 14. Async Validation
+> Async methods handle both sync and async transforms. Use them when at least one transform returns a `Promise`.
 
-Similar to async transforms, you can use async validators for checks that require database or API calls.
+### 14. Excluding Fields
+
+#### `FieldMapping.exclude` — skip an explicit mapping
+
+Set `exclude: true` on a field mapping to skip it entirely at runtime. Useful for suppressing a field from a shared base mapping.
 
 ```typescript
-// Field-level async validation
+const mapping = [
+  { from: 'id' },
+  { from: 'name' },
+  { from: 'password', exclude: true }, // never copied
+];
+```
+
+#### `excludeFields` — exclude named fields from `autoMap`
+
+```typescript
+const dto = Objecter.convert(source, UserDTO, [], {
+  autoMap: true,
+  excludeFields: ['password', 'deletedAt'], // type-safe when TSource is inferred
+});
+```
+
+When `TSource` is known (via a typed `source` argument), `excludeFields` is checked against valid source keys at compile time.
+
+#### `excludePattern` — exclude fields matching a pattern from `autoMap`
+
+```typescript
+// Exclude fields starting with '_'
+Objecter.convert(source, UserDTO, [], { autoMap: true, excludePattern: /^_/ });
+
+// String form is converted to RegExp
+Objecter.convert(source, UserDTO, [], { autoMap: true, excludePattern: '^internal' });
+```
+
+> String patterns are validated before compilation: patterns longer than 1000 characters or containing nested quantifiers (e.g. `(a+)+`, a ReDoS vector) are rejected. Pass a precompiled `RegExp` if such a pattern is intentional.
+
+#### Combining both
+
+`excludeFields` and `excludePattern` are applied together — a field is excluded if it matches either.
+
+```typescript
+Objecter.convert(source, UserDTO, [], { autoMap: true, excludeFields: ['email'], excludePattern: /^_/ });
+```
+
+### 15. Async Validation
+
+```typescript
 const mapping = [
   {
     from: 'username',
-    to: 'username',
     validateAsync: async (username: string) => {
-      const isTaken = await db.checkUsername(username);
-      return isTaken ? { valid: false, errors: ['Username taken'] } : { valid: true };
+      const taken = await db.checkUsername(username);
+      return taken ? { valid: false, errors: ['Username taken'] } : { valid: true };
     },
   },
 ];
 
-// Schema-level async validation
-const validateSchemaAsync: AsyncSchemaValidateFn = async (target, source) => {
-  const isBlacklisted = await db.checkBlacklist(target.email);
-  if (isBlacklisted) return { valid: false, errors: ['Email is blacklisted'] };
-  return { valid: true };
-};
-
-const user = await Objecter.convertAsync(source, UserDto, mapping, { validateSchemaAsync });
+const dto = await Objecter.convertAsync(source, UserDto, mapping, {
+  validateSchemaAsync: async (target: any) => {
+    const blacklisted = await db.checkBlacklist(target.email);
+    return blacklisted ? { valid: false, errors: ['Email blacklisted'] } : { valid: true };
+  },
+});
 ```
 
-> **Note**: `validateAsync` and `validateSchemaAsync` are **only** executed when using async methods (`convertAsync`, etc.). They are ignored by synchronous methods.
+> `validateAsync` and `validateSchemaAsync` are **only** executed by async methods. Sync methods ignore them.
 
-> **Note**: Async methods (`convertAsync`, `convertArrayAsync`, `mapAsync`) can handle both sync and async transforms. Use them when at least one of your transforms returns a Promise.
+---
 
-## API Overview
+## API Reference
 
 ### Core Methods
 
-- `Objecter.convert(source, TargetClass, mapping, options?)`: Convert a single object.
-- `Objecter.convertArray(sourceArray, TargetClass, mapping, options?)`: Convert an array of objects.
-- `Objecter.convertArrayGenerator(sourceArray, TargetClass, mapping, options?)`: Generator for processing large arrays lazyily.
-- `Objecter.createMapper(TargetClass, mapping, options?)`: Create a reusable mapping function.
-- `Objecter.createArrayMapper(TargetClass, mapping, options?)`: Create a reusable array mapping function.
-- `Objecter.merge(sources, TargetClass, mapping, options?)`: Merge multiple objects into one target.
-- `Objecter.toPlainObject(source, mapping?)`: Convert an instance to a plain JavaScript object.
-- `Objecter.configure(options)`: Set global default options for all conversions.
-- `Objecter.resetConfig()`: Reset global options to library defaults.
-- `Objecter.registerProfile(profile)`: Register a reusable mapping profile.
-- `Objecter.map(source, profileName, options?)`: Convert using a registered profile.
-- `Objecter.clearProfiles()`: Clear all registered profiles.
-- `Objecter.convertAsync(source, TargetClass, mapping, options?)`: Async version - for async transforms.
-- `Objecter.convertArrayAsync(sourceArray, TargetClass, mapping, options?)`: Async array conversion.
-- `Objecter.mapAsync(source, profileName, options?)`: Async profile-based mapping.
+| Method                                                                    | Description                              |
+| :------------------------------------------------------------------------ | :--------------------------------------- |
+| `Objecter.convert(source, TargetClass, mapping, options?)`                | Convert a single object                  |
+| `Objecter.convertAsync(source, TargetClass, mapping, options?)`           | Async version — handles async transforms |
+| `Objecter.convertArray(sources, TargetClass, mapping, options?)`          | Convert an array                         |
+| `Objecter.convertArrayAsync(sources, TargetClass, mapping, options?)`     | Async array conversion                   |
+| `Objecter.convertArrayGenerator(sources, TargetClass, mapping, options?)` | Lazy generator for large arrays          |
+| `Objecter.createMapper(TargetClass, mapping, options?)`                   | Returns a reusable single-object mapper  |
+| `Objecter.createArrayMapper(TargetClass, mapping, options?)`              | Returns a reusable array mapper          |
+| `Objecter.merge(sources, TargetClass, mapping, options?)`                 | Merge multiple sources into one target   |
+| `Objecter.toPlainObject(source, mapping?)`                                | Strip prototype, return plain object     |
+| `Objecter.configure(options)`                                             | Set global defaults                      |
+| `Objecter.resetConfig()`                                                  | Reset to library defaults                |
+| `Objecter.registerProfile(profile)`                                       | Register a named mapping profile         |
+| `Objecter.map(source, profileName, options?)`                             | Convert using a registered profile       |
+| `Objecter.mapAsync(source, profileName, options?)`                        | Async profile-based mapping              |
+| `Objecter.clearProfiles()`                                                | Remove all registered profiles           |
+| `Objecter.asTarget<T>()`                                                  | Use an interface as mapping target       |
 
 ### Mapping Options
 
-Configuration object passed to methods as the last argument.
+| Option                   | Type                                                 | Default | Description                                                |
+| :----------------------- | :--------------------------------------------------- | :------ | :--------------------------------------------------------- |
+| `throwOnValidationError` | `boolean`                                            | `true`  | Throw when field or schema validation fails                |
+| `throwOnMissingFields`   | `boolean`                                            | `true`  | Throw when a required source field is missing              |
+| `copyUndefined`          | `boolean`                                            | `false` | Copy fields whose source value is `undefined`              |
+| `strictMapping`          | `boolean`                                            | `true`  | Throw when a mapping targets a non-existent property       |
+| `autoMap`                | `boolean`                                            | `false` | Auto-copy matching property names not explicitly mapped    |
+| `checkCircular`          | `boolean`                                            | `true`  | Guard against circular references during deep clone        |
+| `context`                | `Record<string, unknown>`                            | `{}`    | Extra data passed to transforms and validators             |
+| `validateSchema`         | `(target, source, ctx) => ValidationResult`          | —       | Schema-level validation after all mappings                 |
+| `validateSchemaAsync`    | `(target, source, ctx) => Promise<ValidationResult>` | —       | Async schema validation (async methods only)               |
+| `excludeFields`          | `string[]`                                           | `[]`    | Field names to exclude from `autoMap`                      |
+| `excludePattern`         | `string \| RegExp`                                   | —       | Pattern — matching field names are excluded from `autoMap` |
 
-| Option                   | Type                  | Default | Description                                                              |
-| :----------------------- | :-------------------- | :------ | :----------------------------------------------------------------------- |
-| `throwOnValidationError` | `boolean`             | `true`  | Throw an error if validation fails.                                      |
-| `throwOnMissingFields`   | `boolean`             | `true`  | Throw an error if a required field is missing in source.                 |
-| `copyUndefined`          | `boolean`             | `false` | Whether to copy fields that are `undefined` in source.                   |
-| `strictMapping`          | `boolean`             | `true`  | Throw an error if mapping targets a non-existent property.               |
-| `autoMap`                | `boolean`             | `false` | Automatically copy properties with matching names not explicitly mapped. |
-| `context`                | `Record<string, any>` | `{}`    | Additional context data accessible in transforms/validators.             |
-| `validateSchema`         | `SchemaValidateFn`    | -       | Schema-level validation function executed after all field mappings.      |
+### FieldMapping Options
 
-### Built-in Validators
+`FieldMapping<TSource, TTarget>` is generic. When `TSource` / `TTarget` are known (inferred via `Objecter.convert`), `from` and `to` are checked against valid property paths at compile time. Pass `FieldMapping[]` to opt out of path checking.
 
-Accessible via `Validators` export:
+| Option          | Type                                 | Description                                                                              |
+| :-------------- | :----------------------------------- | :--------------------------------------------------------------------------------------- |
+| `from`          | `string`                             | Source property path (supports `'user.address.city'`); type-safe when `TSource` is known |
+| `to`            | `string`                             | Target property path (defaults to `from`); type-safe when `TTarget` is known             |
+| `transform`     | `TransformFn`                        | Value transformer — may return a `Promise` in async methods                              |
+| `defaultValue`  | `unknown`                            | Fallback when source value is `null` or `undefined`                                      |
+| `optional`      | `boolean`                            | Skip missing field instead of throwing                                                   |
+| `validate`      | `Validator \| Validator[]`           | Sync validator(s)                                                                        |
+| `validateAsync` | `AsyncValidator \| AsyncValidator[]` | Async validator(s) — async methods only                                                  |
+| `skipIfNull`    | `boolean`                            | Skip field when value is `null` or `undefined`                                           |
+| `skipIf`        | `(value, source, ctx) => boolean`    | Predicate — skip field when it returns `true`                                            |
+| `exclude`       | `boolean`                            | Skip this mapping entirely                                                               |
 
-- `required()`: Value must not be null or undefined.
-- `pattern(regex, message?)`: Matches regex pattern.
-- `oneOf(values)`: Value must be in the allowed list.
-- `nonEmptyArray()`: Array must have at least one element.
-- `custom(fn, message)`: Custom validation function.
+---
 
-### Built-in Transformers
+## Built-in Validators
 
-Accessible via `Transformers` export:
+Accessible via `Validators` named export:
 
-- `trim()`: Trim whitespace from string.
-- `toUpperCase()`, `toLowerCase()`: Change string case.
-- `toNumber()`: Convert to number.
-- `toBoolean()`: Convert to boolean.
-- `toString()`: Convert to string.
-- `toDate()`: Convert to Date object.
-- `toISOString()`: Format Date/string/number to ISO string.
-- `parseJSON()`: Parse JSON string.
-- `toJSON()`: Stringify value to JSON.
-- `round(decimals?)`: Round number.
-- `clamp(min, max)`: Clamp number within range.
-- `defaultTo(value)`: Use default if value is null/undefined.
-- `mapValue(map, fallback?)`: Map value using a dictionary object.
-- `pipe(...fns)`: Chain multiple transformers.
-- `when(condition, transform)`: Apply transform only if condition is true.
-- `pick(path)`: Extract nested value from object.
-- `split(delimiter)`: Split string into array.
-- `join(delimiter)`: Join array into string.
+| Validator                             | Description                             |
+| :------------------------------------ | :-------------------------------------- |
+| `Validators.required()`               | Value must not be `null` or `undefined` |
+| `Validators.pattern(regex, message?)` | Must match regex pattern                |
+| `Validators.oneOf(values)`            | Must be one of the allowed values       |
+| `Validators.nonEmptyArray()`          | Array must have at least one element    |
+| `Validators.custom(fn, message)`      | Custom validation function              |
+
+## Built-in Transformers
+
+Accessible via `Transformers` named export:
+
+| Transformer                       | Description                                   |
+| :-------------------------------- | :-------------------------------------------- |
+| `trim()`                          | Trim whitespace from string                   |
+| `toUpperCase()` / `toLowerCase()` | Change string case                            |
+| `toNumber()`                      | Convert to number                             |
+| `toBoolean()`                     | Convert to boolean                            |
+| `toString()`                      | Convert to string                             |
+| `toDate()`                        | Convert to `Date`                             |
+| `toISOString()`                   | Format to ISO string                          |
+| `parseJSON(maxLength?)`           | Parse JSON string (optional input length cap) |
+| `toJSON()`                        | Stringify to JSON                             |
+| `round(decimals?)`                | Round number                                  |
+| `clamp(min, max)`                 | Clamp number within range                     |
+| `defaultTo(value)`                | Use default when value is `null`/`undefined`  |
+| `mapValue(map, fallback?)`        | Map value via a dictionary                    |
+| `pipe(...fns)`                    | Chain multiple transformers                   |
+| `when(condition, transform)`      | Apply transform conditionally                 |
+| `pick(path)`                      | Extract nested value from object              |
+| `split(delimiter)`                | Split string into array                       |
+| `join(delimiter)`                 | Join array into string                        |
+
+---
 
 ## Custom Validators and Transformers
 
-Objecter dirancang untuk memberikan fleksibilitas maksimal kepada developer dalam membuat validator dan transformer sendiri. Daripada menyediakan ratusan built-in functions, library ini menyediakan interface yang simple untuk kamu build logic sesuai kebutuhan domain.
-
-### Creating Custom Validators
-
-Validator bisa berupa simple predicate function atau detailed validation function.
-
-#### Simple Predicate Validator
-
-```typescript
-// Email validator
-const isValidEmail = (value: unknown): boolean => {
-  if (typeof value !== 'string') return false;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-};
-
-// Age range validator
-const isAdult = (value: unknown): boolean => {
-  return typeof value === 'number' && value >= 18 && value <= 120;
-};
-
-// String length validator
-const minLength =
-  (min: number) =>
-  (value: unknown): boolean => {
-    return typeof value === 'string' && value.length >= min;
-  };
-
-const mapping = [
-  { from: 'email', to: 'email', validate: isValidEmail },
-  { from: 'age', to: 'age', validate: isAdult },
-  { from: 'username', to: 'username', validate: minLength(3) },
-];
-```
-
-#### Detailed Validation Function
+### Validators
 
 ```typescript
 import { type ValidateFn } from '@mevaspace/objecter';
 
-// Validator dengan custom error message
+// Simple predicate
+const isAdult = (value: unknown): boolean => typeof value === 'number' && value >= 18;
+
+// Detailed result with custom errors
 const validatePassword: ValidateFn = (value, fieldName) => {
-  if (typeof value !== 'string') {
-    return { valid: false, errors: [`${fieldName} must be a string`] };
-  }
+  if (typeof value !== 'string') return { valid: false, errors: [`${fieldName} must be a string`] };
 
   const errors: string[] = [];
-  if (value.length < 8) errors.push('Password must be at least 8 characters');
-  if (!/[A-Z]/.test(value)) errors.push('Password must contain uppercase letter');
-  if (!/[0-9]/.test(value)) errors.push('Password must contain number');
+  if (value.length < 8) errors.push('Minimum 8 characters');
+  if (!/[A-Z]/.test(value)) errors.push('Requires uppercase letter');
+  if (!/[0-9]/.test(value)) errors.push('Requires number');
 
-  return errors.length > 0 ? { valid: false, errors } : { valid: true };
+  return errors.length ? { valid: false, errors } : { valid: true };
 };
 
-const mapping = [{ from: 'password', to: 'password', validate: validatePassword }];
+// Factory pattern for configurable validators
+const minLength =
+  (min: number) =>
+  (value: unknown): boolean =>
+    typeof value === 'string' && value.length >= min;
 ```
 
-### Integrating with Zod
-
-Objecter mendukung Zod schema secara native melalui `safeParse` interface.
+### Zod Integration
 
 ```typescript
 import { z } from 'zod';
 
-// Direct Zod schema usage
-const userSchema = z.object({
-  email: z.string().email(),
-  age: z.number().min(18).max(120),
-  username: z.string().min(3).max(20),
-});
-
 const mapping = [
-  { from: 'email', to: 'email', validate: z.string().email() },
-  { from: 'age', to: 'age', validate: z.number().min(18) },
-  { from: 'username', to: 'username', validate: userSchema.shape.username },
+  { from: 'email', validate: z.string().email() },
+  { from: 'age', validate: z.number().min(18) },
+  { from: 'username', validate: z.string().min(3).max(20) },
 ];
-
-// Helper untuk convert Zod schema ke ValidateFn
-const zodValidator = <T>(schema: z.ZodSchema<T>): ValidateFn => {
-  return (value, fieldName) => {
-    const result = schema.safeParse(value);
-    if (result.success) return { valid: true };
-
-    const errors = result.error.errors.map((e) => e.message);
-    return { valid: false, errors };
-  };
-};
-
-// Usage
-const mapping2 = [{ from: 'email', to: 'email', validate: zodValidator(z.string().email()) }];
 ```
 
-### Composing Multiple Validators
-
-```typescript
-// Compose validators dengan AND logic
-const composeValidators = (...validators: ValidateFn[]): ValidateFn => {
-  return (value, fieldName, context) => {
-    const allErrors: string[] = [];
-
-    for (const validator of validators) {
-      const result = validator(value, fieldName, context);
-      if (!result.valid && result.errors) {
-        allErrors.push(...result.errors);
-      }
-    }
-
-    return allErrors.length > 0 ? { valid: false, errors: allErrors } : { valid: true };
-  };
-};
-
-// Usage
-const validateEmail: ValidateFn = (value) => {
-  const valid = typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-  return valid ? { valid: true } : { valid: false, errors: ['Invalid email format'] };
-};
-
-const validateNotDisposable: ValidateFn = (value) => {
-  const disposableDomains = ['tempmail.com', 'throwaway.email'];
-  const valid = typeof value === 'string' && !disposableDomains.some((d) => value.endsWith(d));
-  return valid ? { valid: true } : { valid: false, errors: ['Disposable email not allowed'] };
-};
-
-const mapping = [{ from: 'email', to: 'email', validate: composeValidators(validateEmail, validateNotDisposable) }];
-```
-
-### Creating Custom Transformers
-
-Transformer adalah function yang menerima value dan mengembalikan transformed value.
-
-#### Simple Transformers
+### Transformers
 
 ```typescript
 import { type TransformFn } from '@mevaspace/objecter';
 
-// Truncate string
-const truncate = (maxLength: number): TransformFn => {
-  return (value) => {
+// Factory transformer
+const truncate =
+  (maxLength: number): TransformFn =>
+  (value) => {
     if (typeof value !== 'string') return value;
-    return value.length > maxLength ? value.slice(0, maxLength) + '...' : value;
+    return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
   };
-};
 
-// Sanitize HTML
-const sanitizeHtml: TransformFn = (value) => {
-  if (typeof value !== 'string') return value;
-  return value.replace(/[<>]/g, '');
-};
-
-// Array filter
-const filterArray = <T>(predicate: (item: T) => boolean): TransformFn => {
-  return (value) => {
-    if (!Array.isArray(value)) return value;
-    return value.filter(predicate);
-  };
-};
-
-// Array map
-const mapArray = <T, R>(mapper: (item: T) => R): TransformFn => {
-  return (value) => {
-    if (!Array.isArray(value)) return value;
-    return value.map(mapper);
-  };
-};
-
-const mapping = [
-  { from: 'bio', to: 'bio', transform: truncate(200) },
-  { from: 'comment', to: 'comment', transform: sanitizeHtml },
-  { from: 'tags', to: 'activeTags', transform: filterArray((tag: any) => tag.active) },
-];
-```
-
-#### Context-Aware Transformers
-
-```typescript
-// Transformer yang mengakses source object
-const fullName: TransformFn = (_, source: any) => {
-  return `${source.firstName} ${source.lastName}`.trim();
-};
-
-// Transformer yang mengakses context
+// Context-aware transformer
 const formatCurrency: TransformFn = (value, _source, context) => {
-  const locale = context.data?.locale || 'en-US';
-  const currency = context.data?.currency || 'USD';
-
+  const locale = context.data?.locale ?? 'en-US';
+  const currency = context.data?.currency ?? 'USD';
   if (typeof value !== 'number') return value;
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value);
 };
 
+// Composing transformers
 const mapping = [
-  { from: 'firstName', to: 'fullName', transform: fullName },
-  { from: 'price', to: 'formattedPrice', transform: formatCurrency },
+  { from: 'email', transform: Transformers.pipe(Transformers.trim(), Transformers.toLowerCase()) },
+  { from: 'bio', transform: truncate(200) },
+  { from: 'price', transform: formatCurrency },
 ];
 
 const dto = Objecter.convert(source, TargetDTO, mapping, { context: { locale: 'id-ID', currency: 'IDR' } });
 ```
 
-#### Composing Transformers
-
-```typescript
-// Pipe multiple transformers
-const pipe = (...transformers: TransformFn[]): TransformFn => {
-  return (value, source, context) => {
-    return transformers.reduce((acc, transformer) => transformer(acc, source, context), value);
-  };
-};
-
-// Usage
-const mapping = [{ from: 'email', to: 'email', transform: pipe(Transformers.trim(), Transformers.toLowerCase()) }];
-```
-
-### Common Patterns
-
-#### URL Validator
-
-```typescript
-const isValidUrl = (value: unknown): boolean => {
-  if (typeof value !== 'string') return false;
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
-  }
-};
-```
-
-#### UUID Validator
-
-```typescript
-const isValidUUID = (value: unknown): boolean => {
-  if (typeof value !== 'string') return false;
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(value);
-};
-```
-
-#### Array Deduplication
-
-```typescript
-const unique = <T>(): TransformFn => {
-  return (value) => {
-    if (!Array.isArray(value)) return value;
-    return [...new Set(value)];
-  };
-};
-```
-
-#### Object Field Picking
-
-```typescript
-const pick = <T extends Record<string, any>>(keys: string[]): TransformFn => {
-  return (value) => {
-    if (typeof value !== 'object' || value === null) return value;
-    const result: any = {};
-    for (const key of keys) {
-      if (key in value) result[key] = value[key];
-    }
-    return result;
-  };
-};
-
-const omit = <T extends Record<string, any>>(keys: string[]): TransformFn => {
-  return (value) => {
-    if (typeof value !== 'object' || value === null) return value;
-    const result: any = { ...value };
-    for (const key of keys) {
-      delete result[key];
-    }
-    return result;
-  };
-};
-```
-
-### Best Practices
-
-1. **Type Safety**: Selalu check type sebelum melakukan operasi
-
-   ```typescript
-   const safeTrim: TransformFn = (value) => {
-     if (typeof value !== 'string') return value; // Guard clause
-     return value.trim();
-   };
-   ```
-
-2. **Reusability**: Buat factory functions untuk validators/transformers yang configurable
-
-   ```typescript
-   const range =
-     (min: number, max: number) =>
-     (value: unknown): boolean => {
-       return typeof value === 'number' && value >= min && value <= max;
-     };
-   ```
-
-3. **Error Messages**: Berikan error messages yang jelas dan actionable
-
-   ```typescript
-   const validateAge: ValidateFn = (value, fieldName) => {
-     if (typeof value !== 'number') {
-       return { valid: false, errors: [`${fieldName} must be a number`] };
-     }
-     if (value < 0 || value > 150) {
-       return { valid: false, errors: [`${fieldName} must be between 0 and 150`] };
-     }
-     return { valid: true };
-   };
-   ```
-
-4. **Immutability**: Jangan mutate input value, selalu return new value
-
-   ```typescript
-   // Bad
-   const badTransform: TransformFn = (value: any) => {
-     value.processed = true; // Mutation!
-     return value;
-   };
-
-   // Good
-   const goodTransform: TransformFn = (value: any) => {
-     return { ...value, processed: true }; // New object
-   };
-   ```
+---
 
 ## Limitations
 
-1.  **Zero-Argument Constructor**: The target class **must** have a zero-argument constructor (or no constructor defined). Objecter instantiates the target using `new TargetClass()`.
-2.  **Circular References**: Objecter handle circular references with options `checkCircular` (e.g., Parent -> Child -> Parent). Attempting to map circular structures will throw a `Circular reference detected during deep clone` error.
-3.  **Prototype Safety**: `autoMap` iterates over properties defined in the target instance and its prototype chain to determine what to copy. Ensure your target classes are simple DTOs.
+1. **Zero-Argument Constructor**: Target class must have a no-arg constructor (or none defined). Objecter instantiates the target with `new TargetClass()`.
+2. **Circular References**: Circular object graphs will throw `Circular reference detected during deep clone`. Disable with `checkCircular: false` only if you know no cycles exist.
+3. **Prototype Safety**: `autoMap` iterates target instance and prototype properties. Keep target classes as simple DTOs.

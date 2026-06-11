@@ -4,7 +4,7 @@
   "license": "MIT",
   "version": "1.2.0",
   "description": "A simple object manipulation library",
-  "packageManager": "pnpm@10.26.1",
+  "packageManager": "pnpm@11.5.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/mevaspace/objecter.git"
@@ -47,12 +47,13 @@
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/npm": "^13.1.4",
-    "@types/node": "^25.2.3",
+    "@types/node": "catalog:",
     "commitizen": "^4.3.1",
     "commitlint": "^20.4.1",
     "cz-conventional-changelog": "^3.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
+    "oxlint-tsgolint": "catalog:",
     "prettier": "^3.8.1",
     "semantic-release": "^25.0.3"
   },

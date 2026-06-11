@@ -93,11 +93,31 @@ describe('deepClone', () => {
   });
 
   it('should block __proto__ pollution', () => {
-    const malicious = JSON.parse('{"__proto__":{"polluted":true}}');
+    const malicious = JSON.parse('{"__proto__":{"polluted":true}}') as Record<string, unknown>;
     const cloned = deepClone(malicious);
     const clean = {} as Record<string, unknown>;
     expect(clean['polluted']).toBeUndefined();
     expect(cloned).not.toBe(malicious);
+  });
+
+  it('should ignore own enumerable __proto__ key on custom class instances', () => {
+    class Foo {
+      x = 1;
+    }
+    const original = new Foo();
+    Object.defineProperty(original, '__proto__', {
+      value: { polluted: true },
+      configurable: true,
+      enumerable: true,
+      writable: true,
+    });
+
+    const cloned = deepClone(original);
+    expect(cloned).toBeInstanceOf(Foo);
+    expect(cloned.x).toBe(1);
+    expect(Object.getPrototypeOf(cloned)).toBe(Foo.prototype);
+    expect(Object.prototype.hasOwnProperty.call(cloned, '__proto__')).toBe(false);
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
   });
 
   it('should throw on circular reference', () => {

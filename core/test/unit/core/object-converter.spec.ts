@@ -4,6 +4,8 @@ import {
   convertArray,
   convertArrayAsync,
   convertArrayGenerator,
+  createArrayMapper,
+  createMapper,
   merge,
   toPlainObject,
 } from '../../../src/core/object-converter';
@@ -15,6 +17,12 @@ class UserDto {
   fullName = '';
   email = '';
   age = 0;
+}
+
+class ThrowingDto {
+  constructor() {
+    throw new Error('target construction failed');
+  }
 }
 
 const baseOptions = { ...DEFAULT_OPTIONS, strictMapping: false } as Required<typeof DEFAULT_OPTIONS>;
@@ -65,6 +73,19 @@ describe('convert', () => {
     const result = convert({ first_name: 'John' }, UserDto, [{ from: 'first_name', to: 'fullName' }], baseOptions);
     expect(result.fullName).toBe('John');
   });
+
+  it('should auto-map unmapped matching target properties without overwriting explicit mappings', () => {
+    const result = convert(
+      { name: 'Explicit Name', fullName: 'Auto Name', email: 'auto@test.com', age: 42 },
+      UserDto,
+      [{ from: 'name', to: 'fullName' }, { from: 'age' }],
+      { ...baseOptions, autoMap: true },
+    );
+
+    expect(result.fullName).toBe('Explicit Name');
+    expect(result.email).toBe('auto@test.com');
+    expect(result.age).toBe(42);
+  });
 });
 
 describe('convertAsync', () => {
@@ -98,6 +119,19 @@ describe('convertAsync', () => {
       ValidationError,
     );
   });
+
+  it('should auto-map matching properties in async conversions', async () => {
+    const result = await convertAsync(
+      { name: 'Explicit Name', fullName: 'Auto Name', email: 'auto@test.com', age: 42 },
+      UserDto,
+      [{ from: 'name', to: 'fullName' }, { from: 'age' }],
+      { ...baseOptions, autoMap: true },
+    );
+
+    expect(result.fullName).toBe('Explicit Name');
+    expect(result.email).toBe('auto@test.com');
+    expect(result.age).toBe(42);
+  });
 });
 
 describe('convertArray', () => {
@@ -110,14 +144,16 @@ describe('convertArray', () => {
   });
 
   it('should throw MappingError for non-array source', () => {
-    expect(() => convertArray('not-array' as any, UserDto, [], baseOptions)).toThrow(MappingError);
-    expect(() => convertArray('not-array' as any, UserDto, [], baseOptions)).toThrow('Source must be an array');
+    expect(() => convertArray('not-array' as unknown as UserDto[], UserDto, [], baseOptions)).toThrow(MappingError);
+    expect(() => convertArray('not-array' as unknown as UserDto[], UserDto, [], baseOptions)).toThrow(
+      'Source must be an array',
+    );
   });
 
   it('should wrap MappingError with index information', () => {
     const sources = [{ fullName: 'John' }, null];
     try {
-      convertArray(sources as any, UserDto, [{ from: 'fullName' }], baseOptions);
+      convertArray(sources as unknown as UserDto[], UserDto, [{ from: 'fullName' }], baseOptions);
       fail('Should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(MappingError);
@@ -136,6 +172,12 @@ describe('convertArray', () => {
     ];
     expect(() => convertArray([{ fullName: 'x' }], UserDto, mapping, baseOptions)).toThrow(MappingError);
   });
+
+  it('should rethrow non-mapping conversion errors unchanged', () => {
+    expect(() => convertArray([{ fullName: 'x' }], ThrowingDto, [{ from: 'fullName' }], baseOptions)).toThrow(
+      'target construction failed',
+    );
+  });
 });
 
 describe('convertArrayAsync', () => {
@@ -152,12 +194,19 @@ describe('convertArrayAsync', () => {
   });
 
   it('should throw MappingError for non-array source', async () => {
-    await expect(convertArrayAsync('bad' as any, UserDto, [], baseOptions)).rejects.toThrow('Source must be an array');
+    await expect(convertArrayAsync('bad' as unknown as UserDto[], UserDto, [], baseOptions)).rejects.toThrow(
+      'Source must be an array',
+    );
   });
 
   it('should wrap MappingError with index in async mode', async () => {
     try {
-      await convertArrayAsync([{ fullName: 'ok' }, null] as any, UserDto, [{ from: 'fullName' }], baseOptions);
+      await convertArrayAsync(
+        [{ fullName: 'ok' }, null] as unknown as UserDto[],
+        UserDto,
+        [{ from: 'fullName' }],
+        baseOptions,
+      );
       fail('Should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(MappingError);
@@ -176,6 +225,12 @@ describe('convertArrayAsync', () => {
     ];
     await expect(convertArrayAsync([{ fullName: 'x' }], UserDto, mapping, baseOptions)).rejects.toThrow(MappingError);
   });
+
+  it('should rethrow non-mapping async conversion errors unchanged', async () => {
+    await expect(
+      convertArrayAsync([{ fullName: 'x' }], ThrowingDto, [{ from: 'fullName' }], baseOptions),
+    ).rejects.toThrow('target construction failed');
+  });
 });
 
 describe('convertArrayGenerator', () => {
@@ -185,11 +240,11 @@ describe('convertArrayGenerator', () => {
 
     const first = gen.next();
     expect(first.done).toBe(false);
-    expect(first.value.fullName).toBe('A');
+    expect((first.value as UserDto).fullName).toBe('A');
 
     const second = gen.next();
     expect(second.done).toBe(false);
-    expect(second.value.fullName).toBe('B');
+    expect((second.value as UserDto).fullName).toBe('B');
 
     const third = gen.next();
     expect(third.done).toBe(true);
@@ -197,13 +252,13 @@ describe('convertArrayGenerator', () => {
 
   it('should throw MappingError for non-array', () => {
     expect(() => {
-      const gen = convertArrayGenerator('bad' as any, UserDto, [], baseOptions);
+      const gen = convertArrayGenerator('bad' as unknown as UserDto[], UserDto, [], baseOptions);
       gen.next();
     }).toThrow('Source must be an array');
   });
 
   it('should throw MappingError with index for item failure', () => {
-    const sources = [{ fullName: 'ok' }, null] as any;
+    const sources = [{ fullName: 'ok' }, null] as unknown as UserDto[];
     const gen = convertArrayGenerator(sources, UserDto, [{ from: 'fullName' }], baseOptions);
     gen.next(); // first item succeeds
     expect(() => gen.next()).toThrow(/index 1/);
@@ -213,6 +268,67 @@ describe('convertArrayGenerator', () => {
     const sources = [{ fullName: 'X' }, { fullName: 'Y' }];
     const results = [...convertArrayGenerator(sources, UserDto, [{ from: 'fullName' }], baseOptions)];
     expect(results).toHaveLength(2);
+  });
+
+  it('should rethrow non-mapping generator conversion errors unchanged', () => {
+    const gen = convertArrayGenerator([{ fullName: 'x' }], ThrowingDto, [{ from: 'fullName' }], baseOptions);
+    expect(() => gen.next()).toThrow('target construction failed');
+  });
+});
+
+describe('createMapper', () => {
+  it('should create a reusable mapper with runtime context merged into base options', () => {
+    let capturedContext: Record<string, unknown> = {};
+    const mapper = createMapper<{ fullName: string }, UserDto>(
+      UserDto,
+      [
+        {
+          from: 'fullName',
+          transform: (value: unknown, _source, context) => {
+            capturedContext = context?.data ?? {};
+            return value;
+          },
+        },
+      ],
+      { strictMapping: false, context: { base: true } },
+    );
+
+    const result = mapper({ fullName: 'John' }, undefined, {
+      source: {},
+      targetType: UserDto,
+      data: { requestId: 'abc' },
+    });
+
+    expect(result.fullName).toBe('John');
+    expect(capturedContext).toEqual({ base: true, requestId: 'abc' });
+  });
+});
+
+describe('createArrayMapper', () => {
+  it('should create a reusable array mapper with runtime context merged into base options', () => {
+    let capturedContext: Record<string, unknown> = {};
+    const mapper = createArrayMapper<{ fullName: string }, UserDto>(
+      UserDto,
+      [
+        {
+          from: 'fullName',
+          transform: (value: unknown, _source, context) => {
+            capturedContext = context?.data ?? {};
+            return value;
+          },
+        },
+      ],
+      { strictMapping: false, context: { base: true } },
+    );
+
+    const result = mapper([{ fullName: 'Jane' }], undefined, {
+      source: {},
+      targetType: UserDto,
+      data: { requestId: 'xyz' },
+    });
+
+    expect(result[0].fullName).toBe('Jane');
+    expect(capturedContext).toEqual({ base: true, requestId: 'xyz' });
   });
 });
 
@@ -234,6 +350,21 @@ describe('merge', () => {
     const sources = [null, undefined, 'string', { fullName: 'John' }];
     const result = merge(sources, UserDto, [{ from: 'fullName' }], baseOptions);
     expect(result.fullName).toBe('John');
+  });
+
+  it('should not rewrite prototypes via own __proto__ key in a source', () => {
+    const malicious = JSON.parse('{"__proto__": {"polluted": true}, "fullName": "Evil"}') as Record<string, unknown>;
+    const result = merge(
+      [malicious, { email: 'a@b.c' }],
+      UserDto,
+      [{ from: 'fullName' }, { from: 'email' }],
+      baseOptions,
+    );
+    expect(result.fullName).toBe('Evil');
+    expect(result.email).toBe('a@b.c');
+    expect((result as unknown as Record<string, unknown>).polluted).toBeUndefined();
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.getPrototypeOf(result)).toBe(UserDto.prototype);
   });
 });
 
@@ -268,5 +399,19 @@ describe('toPlainObject', () => {
       { from: 'lastName', to: 'last' },
     ]);
     expect(result).toEqual({ first: 'John', last: 'Doe' });
+  });
+
+  it('should wrap mapping errors when applying a plain-object mapping', () => {
+    expect(() =>
+      toPlainObject({ firstName: 'John' }, [
+        {
+          from: 'firstName',
+          to: 'first',
+          transform: () => {
+            throw new TypeError('plain transform failed');
+          },
+        },
+      ]),
+    ).toThrow(MappingError);
   });
 });

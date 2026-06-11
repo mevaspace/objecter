@@ -1,5 +1,6 @@
-import type { MappingContext } from './mapping-context.interface';
-import type { ValidationResult } from './validation-result.interface';
+import type { MappingContext } from './mapping-context.type';
+import type { ValidationResult } from './validation-result.type';
+import type { ExcludeFieldsOf } from './property-path.type';
 
 /**
  * Schema validation predicate function
@@ -28,7 +29,7 @@ export type AsyncSchemaValidateFn = (
 /**
  * Mapping configuration options
  */
-export interface MappingOptions {
+export interface MappingOptions<TSource = unknown> {
   /** Whether to throw on validation errors (default: true) */
   throwOnValidationError?: boolean;
   /** Whether to throw on missing required fields (default: true) */
@@ -59,4 +60,8 @@ export interface MappingOptions {
    * Useful for validations that require async operations like database lookups
    */
   validateSchemaAsync?: AsyncSchemaValidateFn;
+  /** Field names to exclude from autoMap (type-safe when TSource is known) */
+  excludeFields?: ExcludeFieldsOf<TSource>;
+  /** Regex or string pattern — fields matching it are excluded from autoMap */
+  excludePattern?: string | RegExp;
 }

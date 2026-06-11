@@ -1,7 +1,7 @@
 import type { NestedKeyOf } from './property-path.type';
 import type { TransformFn } from './transform-fn.type';
 import type { Validator, AsyncValidator } from './validator.type';
-import type { MappingContext } from './mapping-context.interface';
+import type { MappingContext } from './mapping-context.type';
 
 /**
  * Predicate function to determine if a field should be skipped
@@ -21,7 +21,7 @@ export type SkipIfPredicate = (value: unknown, source: unknown, context: Mapping
  * Helper type to get property path - uses NestedKeyOf for known object types,
  * falls back to PropertyPath for unknown/any
  */
-type PropertyPathOf<T> = unknown extends T ? string : T extends object ? NestedKeyOf<T> | string : string;
+type PropertyPathOf<T> = unknown extends T ? string : T extends object ? NestedKeyOf<T> | (string & {}) : string;
 
 export interface FieldMapping<TSource = unknown, TTarget = unknown> {
   /** Source property path (supports nested paths like 'user.name') */
@@ -42,4 +42,6 @@ export interface FieldMapping<TSource = unknown, TTarget = unknown> {
   skipIfNull?: boolean;
   /** Predicate function to determine if this field should be skipped */
   skipIf?: SkipIfPredicate;
+  /** When true, skip this field mapping entirely */
+  exclude?: boolean;
 }

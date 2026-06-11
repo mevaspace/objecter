@@ -1,6 +1,6 @@
 import type { Constructor } from './constructor.type';
-import type { FieldMapping } from './field-mapping.interface';
-import type { MappingOptions } from './mapping-options.interface';
+import type { FieldMapping } from './field-mapping.type';
+import type { MappingOptions } from './mapping-options.type';
 
 /**
  * Mapping profile for reusable mapping definitions

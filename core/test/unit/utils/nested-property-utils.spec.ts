@@ -60,15 +60,38 @@ describe('getNestedValue', () => {
     expect(pathCache.size).toBe(1);
   });
 
-  it('should clear cache when exceeding 1000 entries', () => {
+  it('should evict only the oldest entry when exceeding 1000 entries', () => {
     for (let i = 0; i < 1000; i++) {
       getNestedValue({}, `path_${i}`);
     }
     expect(pathCache.size).toBe(1000);
 
     getNestedValue({}, 'overflow_key');
-    expect(pathCache.size).toBe(1);
+    expect(pathCache.size).toBe(1000);
     expect(pathCache.has('overflow_key')).toBe(true);
+    expect(pathCache.has('path_0')).toBe(false);
+    expect(pathCache.has('path_1')).toBe(true);
+  });
+
+  it('should return undefined for __proto__ path', () => {
+    expect(getNestedValue({ a: 1 }, '__proto__')).toBeUndefined();
+  });
+
+  it('should return undefined for constructor.prototype path', () => {
+    expect(getNestedValue({ a: 1 }, 'constructor.prototype')).toBeUndefined();
+  });
+
+  it('should return undefined for nested __proto__ segment', () => {
+    expect(getNestedValue({ a: { b: 1 } }, 'a.__proto__.b')).toBeUndefined();
+  });
+
+  it('should return undefined for forbidden array key', () => {
+    expect(getNestedValue({ a: [1] }, '__proto__[0]')).toBeUndefined();
+  });
+
+  it('should not leak own enumerable __proto__ data key', () => {
+    const obj = JSON.parse('{"__proto__": {"secret": 1}}') as Record<string, unknown>;
+    expect(getNestedValue(obj, '__proto__.secret')).toBeUndefined();
   });
 });
 

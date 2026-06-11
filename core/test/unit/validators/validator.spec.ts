@@ -1,7 +1,8 @@
 import { Validators } from '../../../src/validators/validator';
+import type { MappingContext, Constructor } from '../../../src/types';
 
 describe('Validators', () => {
-  const dummyContext = { source: {}, targetType: Object, data: {} } as any;
+  const dummyContext: MappingContext = { source: {}, targetType: Object as unknown as Constructor<unknown>, data: {} };
 
   describe('required()', () => {
     const validate = Validators.required();
@@ -40,7 +41,7 @@ describe('Validators', () => {
     });
 
     it('should return invalid for non-string input', () => {
-      const result = emailPattern(42 as any, 'email', dummyContext);
+      const result = emailPattern(42 as unknown as string, 'email', dummyContext);
       expect(result.valid).toBe(false);
     });
 
@@ -79,7 +80,7 @@ describe('Validators', () => {
     });
 
     it('should return invalid for non-array', () => {
-      const result = validate('not-array' as any, 'items', dummyContext);
+      const result = validate('not-array' as unknown as unknown[], 'items', dummyContext);
       expect(result.valid).toBe(false);
     });
   });

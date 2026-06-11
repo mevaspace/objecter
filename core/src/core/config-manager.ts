@@ -20,8 +20,7 @@ export const DEFAULT_OPTIONS: Required<MappingOptions> = {
 /**
  * Global options that override defaults
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let globalOptions: Partial<MappingOptions<any>> = {};
+let globalOptions: Partial<MappingOptions> = {};
 
 /**
  * Configures global default options for all conversions
@@ -40,7 +39,6 @@ export function resetConfig(): void {
   globalOptions = {};
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getMergedOptions(options?: MappingOptions<any>): Required<MappingOptions> {
+export function getMergedOptions(options?: MappingOptions): Required<MappingOptions> {
   return { ...DEFAULT_OPTIONS, ...globalOptions, ...options } as Required<MappingOptions>;
 }

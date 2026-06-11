@@ -1,6 +1,6 @@
 import { MappingError } from '../errors';
 import { Constructor, FieldMapping, MappingContext, MappingOptions } from '../types';
-import { deepClone } from '../utils';
+import { deepClone, FORBIDDEN_KEYS } from '../utils';
 import { DEFAULT_OPTIONS } from './config-manager';
 import {
   initializeConversion,
@@ -249,7 +249,16 @@ export function merge<TTarget>(
 
   for (const source of sources) {
     if (source && typeof source === 'object') {
-      Object.assign(mergedSource, deepClone(source, options.checkCircular));
+      const cloned = deepClone(source, options.checkCircular) as Record<string, unknown>;
+      // Object.assign would trigger the '__proto__' setter for an own
+      // enumerable '__proto__' key (e.g. from JSON.parse), rewriting
+      // mergedSource's prototype — copy keys explicitly instead
+      for (const key of Object.keys(cloned)) {
+        if (FORBIDDEN_KEYS.has(key)) {
+          continue;
+        }
+        mergedSource[key] = cloned[key];
+      }
     }
   }
 

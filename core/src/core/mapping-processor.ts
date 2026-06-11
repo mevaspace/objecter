@@ -2,15 +2,12 @@ import { MappingError, ValidationError } from '../errors';
 import { FieldMapping, MappingContext, MappingOptions } from '../types';
 import { getNestedValue, setNestedValue, normalizeValidator, normalizeAsyncValidator, deepClone } from '../utils';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type RuntimeFieldMapping = FieldMapping<any, any>;
-
 /**
  * Handles missing or null values with defaultValue and optional logic
  */
 function handleMissingValue(
   value: unknown,
-  fieldMap: RuntimeFieldMapping,
+  fieldMap: FieldMapping<unknown, unknown>,
   options: Required<MappingOptions>,
   source: unknown,
   context: MappingContext,
@@ -69,7 +66,7 @@ function accumulateErrors(
  */
 function runValidators(
   value: unknown,
-  fieldMap: RuntimeFieldMapping,
+  fieldMap: FieldMapping<unknown, unknown>,
   context: MappingContext,
   validationErrors: Map<string, string[]> | undefined,
 ): Map<string, string[]> | undefined {
@@ -96,7 +93,7 @@ function runValidators(
  */
 async function runValidatorsAsync(
   value: unknown,
-  fieldMap: RuntimeFieldMapping,
+  fieldMap: FieldMapping<unknown, unknown>,
   context: MappingContext,
   validationErrors: Map<string, string[]> | undefined,
 ): Promise<Map<string, string[]> | undefined> {
@@ -132,7 +129,7 @@ async function runValidatorsAsync(
 export function processFieldMapping(
   source: unknown,
   target: Record<string, unknown>,
-  fieldMap: RuntimeFieldMapping,
+  fieldMap: FieldMapping<unknown, unknown>,
   context: MappingContext,
   options: Required<MappingOptions>,
   validationErrors: Map<string, string[]> | undefined,
@@ -168,7 +165,7 @@ export function processFieldMapping(
 export async function processFieldMappingAsync(
   source: unknown,
   target: Record<string, unknown>,
-  fieldMap: RuntimeFieldMapping,
+  fieldMap: FieldMapping<unknown, unknown>,
   context: MappingContext,
   options: Required<MappingOptions>,
   validationErrors: Map<string, string[]> | undefined,
@@ -202,7 +199,7 @@ export async function processFieldMappingAsync(
 /**
  * Wraps errors from field mapping with proper context
  */
-export function wrapMappingError(error: unknown, fieldMap: RuntimeFieldMapping, source: unknown): never {
+export function wrapMappingError(error: unknown, fieldMap: FieldMapping<unknown, unknown>, source: unknown): never {
   if (error instanceof MappingError) {
     const newField = `${fieldMap.from}.${error.field}`;
     throw new MappingError(error.message.replace(error.field, newField), newField, error.sourceValue, error.errors);

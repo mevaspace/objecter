@@ -1,0 +1,24 @@
+{
+  "ignorePatterns": ["dist/**", "coverage/**", ".scripts/**"],
+  "options": { "typeAware": true, "typeCheck": true },
+  "rules": {
+    "no-console": ["error", { "allow": ["warn"] }],
+    "no-unused-vars": [
+      "error",
+      {
+        "vars": "all",
+        "varsIgnorePattern": "^_",
+        "args": "after-used",
+        "argsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "fix": { "imports": "safe-fix" }
+      }
+    ],
+    "typescript/no-explicit-any": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/unbound-method": "error"
+  }
+}

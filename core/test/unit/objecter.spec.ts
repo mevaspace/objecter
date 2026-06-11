@@ -162,7 +162,7 @@ describe('Objecter.createMapper', () => {
       [
         {
           from: 'name',
-          transform: (_v, _s, ctx) => {
+          transform: (_v: unknown, _s, ctx) => {
             if (ctx) capturedContext = ctx.data as Record<string, unknown>;
             return _v;
           },
@@ -193,7 +193,7 @@ describe('Objecter.createArrayMapper', () => {
       [
         {
           from: 'name',
-          transform: (_v, _s, ctx) => {
+          transform: (_v: unknown, _s, ctx) => {
             if (ctx) capturedContext = ctx.data as Record<string, unknown>;
             return _v;
           },

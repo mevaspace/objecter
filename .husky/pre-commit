@@ -1,5 +1,3 @@
 #!/bin/sh
 
-pnpm test:cov
-
-pnpm dlx lint-staged
+pnpm exec lint-staged

@@ -1,6 +1,6 @@
 import { ValidationError } from '../errors';
 import { Constructor, MappingContext, MappingOptions } from '../types';
-import { isPlainObject, deepClone } from '../utils';
+import { isPlainObject, deepClone, FORBIDDEN_KEYS } from '../utils';
 import { DEFAULT_OPTIONS } from './config-manager';
 
 /**
@@ -23,11 +23,31 @@ export function initializeConversion<TSource, TTarget>(
 }
 
 /**
+ * Limits for string-built exclude patterns to mitigate ReDoS via untrusted config
+ */
+const MAX_EXCLUDE_PATTERN_LENGTH = 1000;
+/**
+ * Heuristic for catastrophic backtracking: a quantified token immediately
+ * before a closing group that is itself quantified, e.g. (a+)+, (a*){2,}, ((a)+)+
+ */
+const NESTED_QUANTIFIER_PATTERN = /[+*}]\)[+*{]/;
+
+/**
  * Applies AutoMap logic to copy matching properties
  */
 function buildExcludePattern(options: Required<MappingOptions>): RegExp | null {
   if (!options.excludePattern) return null;
-  return typeof options.excludePattern === 'string' ? new RegExp(options.excludePattern) : options.excludePattern;
+  if (typeof options.excludePattern !== 'string') return options.excludePattern;
+
+  if (options.excludePattern.length > MAX_EXCLUDE_PATTERN_LENGTH) {
+    throw new Error(`excludePattern exceeds maximum length of ${MAX_EXCLUDE_PATTERN_LENGTH} characters`);
+  }
+  if (NESTED_QUANTIFIER_PATTERN.test(options.excludePattern)) {
+    throw new Error(
+      `excludePattern '${options.excludePattern}' contains nested quantifiers that can cause catastrophic backtracking; pass a precompiled RegExp instead if this pattern is intentional`,
+    );
+  }
+  return new RegExp(options.excludePattern);
 }
 
 function isExcluded(key: string, excludeSet: Set<string> | null, excludeRe: RegExp | null): boolean {
@@ -59,7 +79,10 @@ export function applyAutoMapping(
   const excludeRe = buildExcludePattern(options);
 
   for (const key of targetKeys) {
-    if (key === 'constructor') {
+    // '__proto__' and 'prototype' must be skipped along with 'constructor':
+    // with an Object target the key set comes from the source, and assigning
+    // an own '__proto__' key would rewrite the target's prototype
+    if (FORBIDDEN_KEYS.has(key)) {
       continue;
     }
     if (mappedTargetProps?.has(key)) {

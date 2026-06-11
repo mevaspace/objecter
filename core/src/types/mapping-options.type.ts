@@ -1,5 +1,5 @@
-import type { MappingContext } from './mapping-context.interface';
-import type { ValidationResult } from './validation-result.interface';
+import type { MappingContext } from './mapping-context.type';
+import type { ValidationResult } from './validation-result.type';
 import type { ExcludeFieldsOf } from './property-path.type';
 
 /**

@@ -144,14 +144,16 @@ describe('convertArray', () => {
   });
 
   it('should throw MappingError for non-array source', () => {
-    expect(() => convertArray('not-array' as any, UserDto, [], baseOptions)).toThrow(MappingError);
-    expect(() => convertArray('not-array' as any, UserDto, [], baseOptions)).toThrow('Source must be an array');
+    expect(() => convertArray('not-array' as unknown as UserDto[], UserDto, [], baseOptions)).toThrow(MappingError);
+    expect(() => convertArray('not-array' as unknown as UserDto[], UserDto, [], baseOptions)).toThrow(
+      'Source must be an array',
+    );
   });
 
   it('should wrap MappingError with index information', () => {
     const sources = [{ fullName: 'John' }, null];
     try {
-      convertArray(sources as any, UserDto, [{ from: 'fullName' }], baseOptions);
+      convertArray(sources as unknown as UserDto[], UserDto, [{ from: 'fullName' }], baseOptions);
       fail('Should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(MappingError);
@@ -192,12 +194,19 @@ describe('convertArrayAsync', () => {
   });
 
   it('should throw MappingError for non-array source', async () => {
-    await expect(convertArrayAsync('bad' as any, UserDto, [], baseOptions)).rejects.toThrow('Source must be an array');
+    await expect(convertArrayAsync('bad' as unknown as UserDto[], UserDto, [], baseOptions)).rejects.toThrow(
+      'Source must be an array',
+    );
   });
 
   it('should wrap MappingError with index in async mode', async () => {
     try {
-      await convertArrayAsync([{ fullName: 'ok' }, null] as any, UserDto, [{ from: 'fullName' }], baseOptions);
+      await convertArrayAsync(
+        [{ fullName: 'ok' }, null] as unknown as UserDto[],
+        UserDto,
+        [{ from: 'fullName' }],
+        baseOptions,
+      );
       fail('Should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(MappingError);
@@ -231,11 +240,11 @@ describe('convertArrayGenerator', () => {
 
     const first = gen.next();
     expect(first.done).toBe(false);
-    expect(first.value.fullName).toBe('A');
+    expect((first.value as UserDto).fullName).toBe('A');
 
     const second = gen.next();
     expect(second.done).toBe(false);
-    expect(second.value.fullName).toBe('B');
+    expect((second.value as UserDto).fullName).toBe('B');
 
     const third = gen.next();
     expect(third.done).toBe(true);
@@ -243,13 +252,13 @@ describe('convertArrayGenerator', () => {
 
   it('should throw MappingError for non-array', () => {
     expect(() => {
-      const gen = convertArrayGenerator('bad' as any, UserDto, [], baseOptions);
+      const gen = convertArrayGenerator('bad' as unknown as UserDto[], UserDto, [], baseOptions);
       gen.next();
     }).toThrow('Source must be an array');
   });
 
   it('should throw MappingError with index for item failure', () => {
-    const sources = [{ fullName: 'ok' }, null] as any;
+    const sources = [{ fullName: 'ok' }, null] as unknown as UserDto[];
     const gen = convertArrayGenerator(sources, UserDto, [{ from: 'fullName' }], baseOptions);
     gen.next(); // first item succeeds
     expect(() => gen.next()).toThrow(/index 1/);
@@ -275,7 +284,7 @@ describe('createMapper', () => {
       [
         {
           from: 'fullName',
-          transform: (value, _source, context) => {
+          transform: (value: unknown, _source, context) => {
             capturedContext = context?.data ?? {};
             return value;
           },
@@ -303,7 +312,7 @@ describe('createArrayMapper', () => {
       [
         {
           from: 'fullName',
-          transform: (value, _source, context) => {
+          transform: (value: unknown, _source, context) => {
             capturedContext = context?.data ?? {};
             return value;
           },
@@ -341,6 +350,21 @@ describe('merge', () => {
     const sources = [null, undefined, 'string', { fullName: 'John' }];
     const result = merge(sources, UserDto, [{ from: 'fullName' }], baseOptions);
     expect(result.fullName).toBe('John');
+  });
+
+  it('should not rewrite prototypes via own __proto__ key in a source', () => {
+    const malicious = JSON.parse('{"__proto__": {"polluted": true}, "fullName": "Evil"}') as Record<string, unknown>;
+    const result = merge(
+      [malicious, { email: 'a@b.c' }],
+      UserDto,
+      [{ from: 'fullName' }, { from: 'email' }],
+      baseOptions,
+    );
+    expect(result.fullName).toBe('Evil');
+    expect(result.email).toBe('a@b.c');
+    expect((result as unknown as Record<string, unknown>).polluted).toBeUndefined();
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.getPrototypeOf(result)).toBe(UserDto.prototype);
   });
 });
 

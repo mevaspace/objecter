@@ -236,7 +236,7 @@ const plain = Objecter.toPlainObject(userEntity, mapping);
 
 ### 10. Mapping to Interfaces
 
-Use `asTarget<T>()` to map to an interface without defining a concrete class.
+Use `asTarget<T>()` (or `Objecter.asTarget<T>()`) to map to an interface without defining a concrete class.
 
 ```typescript
 import { Objecter, asTarget } from '@mevaspace/objecter';
@@ -246,11 +246,18 @@ interface IUserTarget {
   age: number;
 }
 
+// Standalone import form
 const result = Objecter.convert(source, asTarget<IUserTarget>(), [
   { from: 'firstName', to: 'fullName' },
   { from: 'birthYear', to: 'age' },
 ]);
-// Returns a plain object typed as IUserTarget
+
+// Equivalent static method form
+const result2 = Objecter.convert(source, Objecter.asTarget<IUserTarget>(), [
+  { from: 'firstName', to: 'fullName' },
+  { from: 'birthYear', to: 'age' },
+]);
+// Both return a plain object typed as IUserTarget
 ```
 
 ### 11. Global Configuration
@@ -352,6 +359,8 @@ Objecter.convert(source, UserDTO, [], { autoMap: true, excludePattern: /^_/ });
 Objecter.convert(source, UserDTO, [], { autoMap: true, excludePattern: '^internal' });
 ```
 
+> String patterns are validated before compilation: patterns longer than 1000 characters or containing nested quantifiers (e.g. `(a+)+`, a ReDoS vector) are rejected. Pass a precompiled `RegExp` if such a pattern is intentional.
+
 #### Combining both
 
 `excludeFields` and `excludePattern` are applied together — a field is excluded if it matches either.
@@ -406,7 +415,7 @@ const dto = await Objecter.convertAsync(source, UserDto, mapping, {
 | `Objecter.map(source, profileName, options?)`                             | Convert using a registered profile       |
 | `Objecter.mapAsync(source, profileName, options?)`                        | Async profile-based mapping              |
 | `Objecter.clearProfiles()`                                                | Remove all registered profiles           |
-| `asTarget<T>()`                                                           | Use an interface as mapping target       |
+| `Objecter.asTarget<T>()`                                                  | Use an interface as mapping target       |
 
 ### Mapping Options
 
@@ -426,18 +435,20 @@ const dto = await Objecter.convertAsync(source, UserDto, mapping, {
 
 ### FieldMapping Options
 
-| Option          | Type                                 | Description                                                 |
-| :-------------- | :----------------------------------- | :---------------------------------------------------------- |
-| `from`          | `string`                             | Source property path (supports `'user.address.city'`)       |
-| `to`            | `string`                             | Target property path (defaults to `from`)                   |
-| `transform`     | `TransformFn`                        | Value transformer — may return a `Promise` in async methods |
-| `defaultValue`  | `unknown`                            | Fallback when source value is `null` or `undefined`         |
-| `optional`      | `boolean`                            | Skip missing field instead of throwing                      |
-| `validate`      | `Validator \| Validator[]`           | Sync validator(s)                                           |
-| `validateAsync` | `AsyncValidator \| AsyncValidator[]` | Async validator(s) — async methods only                     |
-| `skipIfNull`    | `boolean`                            | Skip field when value is `null` or `undefined`              |
-| `skipIf`        | `(value, source, ctx) => boolean`    | Predicate — skip field when it returns `true`               |
-| `exclude`       | `boolean`                            | Skip this mapping entirely                                  |
+`FieldMapping<TSource, TTarget>` is generic. When `TSource` / `TTarget` are known (inferred via `Objecter.convert`), `from` and `to` are checked against valid property paths at compile time. Pass `FieldMapping[]` to opt out of path checking.
+
+| Option          | Type                                 | Description                                                                              |
+| :-------------- | :----------------------------------- | :--------------------------------------------------------------------------------------- |
+| `from`          | `string`                             | Source property path (supports `'user.address.city'`); type-safe when `TSource` is known |
+| `to`            | `string`                             | Target property path (defaults to `from`); type-safe when `TTarget` is known             |
+| `transform`     | `TransformFn`                        | Value transformer — may return a `Promise` in async methods                              |
+| `defaultValue`  | `unknown`                            | Fallback when source value is `null` or `undefined`                                      |
+| `optional`      | `boolean`                            | Skip missing field instead of throwing                                                   |
+| `validate`      | `Validator \| Validator[]`           | Sync validator(s)                                                                        |
+| `validateAsync` | `AsyncValidator \| AsyncValidator[]` | Async validator(s) — async methods only                                                  |
+| `skipIfNull`    | `boolean`                            | Skip field when value is `null` or `undefined`                                           |
+| `skipIf`        | `(value, source, ctx) => boolean`    | Predicate — skip field when it returns `true`                                            |
+| `exclude`       | `boolean`                            | Skip this mapping entirely                                                               |
 
 ---
 
@@ -457,26 +468,26 @@ Accessible via `Validators` named export:
 
 Accessible via `Transformers` named export:
 
-| Transformer                       | Description                                  |
-| :-------------------------------- | :------------------------------------------- |
-| `trim()`                          | Trim whitespace from string                  |
-| `toUpperCase()` / `toLowerCase()` | Change string case                           |
-| `toNumber()`                      | Convert to number                            |
-| `toBoolean()`                     | Convert to boolean                           |
-| `toString()`                      | Convert to string                            |
-| `toDate()`                        | Convert to `Date`                            |
-| `toISOString()`                   | Format to ISO string                         |
-| `parseJSON()`                     | Parse JSON string                            |
-| `toJSON()`                        | Stringify to JSON                            |
-| `round(decimals?)`                | Round number                                 |
-| `clamp(min, max)`                 | Clamp number within range                    |
-| `defaultTo(value)`                | Use default when value is `null`/`undefined` |
-| `mapValue(map, fallback?)`        | Map value via a dictionary                   |
-| `pipe(...fns)`                    | Chain multiple transformers                  |
-| `when(condition, transform)`      | Apply transform conditionally                |
-| `pick(path)`                      | Extract nested value from object             |
-| `split(delimiter)`                | Split string into array                      |
-| `join(delimiter)`                 | Join array into string                       |
+| Transformer                       | Description                                   |
+| :-------------------------------- | :-------------------------------------------- |
+| `trim()`                          | Trim whitespace from string                   |
+| `toUpperCase()` / `toLowerCase()` | Change string case                            |
+| `toNumber()`                      | Convert to number                             |
+| `toBoolean()`                     | Convert to boolean                            |
+| `toString()`                      | Convert to string                             |
+| `toDate()`                        | Convert to `Date`                             |
+| `toISOString()`                   | Format to ISO string                          |
+| `parseJSON(maxLength?)`           | Parse JSON string (optional input length cap) |
+| `toJSON()`                        | Stringify to JSON                             |
+| `round(decimals?)`                | Round number                                  |
+| `clamp(min, max)`                 | Clamp number within range                     |
+| `defaultTo(value)`                | Use default when value is `null`/`undefined`  |
+| `mapValue(map, fallback?)`        | Map value via a dictionary                    |
+| `pipe(...fns)`                    | Chain multiple transformers                   |
+| `when(condition, transform)`      | Apply transform conditionally                 |
+| `pick(path)`                      | Extract nested value from object              |
+| `split(delimiter)`                | Split string into array                       |
+| `join(delimiter)`                 | Join array into string                        |
 
 ---
 

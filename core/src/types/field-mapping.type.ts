@@ -1,7 +1,7 @@
 import type { NestedKeyOf } from './property-path.type';
 import type { TransformFn } from './transform-fn.type';
 import type { Validator, AsyncValidator } from './validator.type';
-import type { MappingContext } from './mapping-context.interface';
+import type { MappingContext } from './mapping-context.type';
 
 /**
  * Predicate function to determine if a field should be skipped

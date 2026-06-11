@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 # note files
 REPORT.md
 PROJECT_PRD.md
+
+# AI local
+.agents/plans

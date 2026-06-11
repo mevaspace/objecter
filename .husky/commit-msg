@@ -1,4 +1,4 @@
 #!/bin/sh
 
-npx --no -- commitlint --edit $1
+pnpm exec commitlint --edit $1
 node ./scripts/commit-msg.ts "$1"

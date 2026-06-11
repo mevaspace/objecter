@@ -19,7 +19,13 @@ describe('Feature 3: Nested Object Mapping', () => {
       const result = Objecter.convert(
         source,
         LocationTarget,
-        [{ from: 'address', to: 'location', transform: (v: unknown) => addressMapper(v as any) }],
+        [
+          {
+            from: 'address',
+            to: 'location',
+            transform: (v: unknown) => addressMapper(v as { city: string; zip: string }),
+          },
+        ],
         { strictMapping: false },
       );
       expect(result.location).toBeInstanceOf(AddressDTO);
@@ -42,7 +48,13 @@ describe('Feature 3: Nested Object Mapping', () => {
       const result = Objecter.convert(
         source,
         LocationTarget,
-        [{ from: 'addresses', to: 'locations', transform: (v: unknown) => arrayMapper(v as any) }],
+        [
+          {
+            from: 'addresses',
+            to: 'locations',
+            transform: (v: unknown) => arrayMapper(v as { city: string; zip: string }[]),
+          },
+        ],
         { strictMapping: false },
       );
       expect(result.locations).toHaveLength(2);
@@ -93,19 +105,21 @@ describe('Feature 3: Nested Object Mapping', () => {
     });
 
     it('should block prototype pollution attempt via __proto__', () => {
-      const malicious = JSON.parse('{"__proto__": {"polluted": true}, "value": "safe"}');
+      const malicious = JSON.parse('{"__proto__": {"polluted": true}, "value": "safe"}') as Record<string, unknown>;
       const result = Objecter.convert(malicious, LocationTarget, [{ from: 'value', to: 'value' }], {
         strictMapping: false,
       });
       expect(result.value).toBe('safe');
-      expect((Object.prototype as any).polluted).toBeUndefined();
+      expect((Object.prototype as Record<string, unknown>).polluted).toBeUndefined();
     });
 
     it('should throw when array mapper receives non-array input', () => {
       const arrayMapper = Objecter.createArrayMapper<{ city: string }, AddressDTO>(AddressDTO, [{ from: 'city' }], {
         strictMapping: false,
       });
-      expect(() => arrayMapper('NotAnArray' as any)).toThrow('Source must be an array');
+      expect(() => arrayMapper('NotAnArray' as unknown as { city: string; zip: string }[])).toThrow(
+        'Source must be an array',
+      );
     });
   });
 });

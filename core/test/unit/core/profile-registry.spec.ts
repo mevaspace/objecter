@@ -1,5 +1,6 @@
 import { registerProfile, clearProfiles, getProfile, validateMappingConfig } from '../../../src/core/profile-registry';
 import { MappingError } from '../../../src/errors/mapping.error';
+import type { FieldMapping } from '../../../src/types';
 
 class TargetClass {
   name = '';
@@ -29,13 +30,15 @@ describe('registerProfile', () => {
   });
 
   it('should throw MappingError for non-string name', () => {
-    expect(() => registerProfile({ name: 123 as any, targetClass: TargetClass, mapping: [{ from: 'name' }] })).toThrow(
-      MappingError,
-    );
+    expect(() =>
+      registerProfile({ name: 123 as unknown as string, targetClass: TargetClass, mapping: [{ from: 'name' }] }),
+    ).toThrow(MappingError);
   });
 
   it('should throw MappingError for invalid mapping (not array)', () => {
-    expect(() => registerProfile({ name: 'p', targetClass: TargetClass, mapping: 'bad' as any })).toThrow(MappingError);
+    expect(() =>
+      registerProfile({ name: 'p', targetClass: TargetClass, mapping: 'bad' as unknown as FieldMapping[] }),
+    ).toThrow(MappingError);
   });
 
   it('should overwrite existing profile with same name', () => {
@@ -74,7 +77,7 @@ describe('validateMappingConfig', () => {
   });
 
   it('should throw for non-array', () => {
-    expect(() => validateMappingConfig('not-array' as any)).toThrow(MappingError);
+    expect(() => validateMappingConfig('not-array' as unknown as FieldMapping[])).toThrow(MappingError);
   });
 
   it('should throw for empty from', () => {
@@ -82,7 +85,7 @@ describe('validateMappingConfig', () => {
   });
 
   it('should throw for non-string from', () => {
-    expect(() => validateMappingConfig([{ from: 42 as any }])).toThrow(MappingError);
+    expect(() => validateMappingConfig([{ from: 42 as unknown as string }])).toThrow(MappingError);
   });
 
   it('should throw for duplicate target paths', () => {

@@ -1,8 +1,9 @@
 import { Transformers } from '../../../src/transformers/transformers';
+import type { MappingContext, Constructor } from '../../../src/types';
 
 describe('Transformers', () => {
   const dummySource = {};
-  const dummyContext = { source: {}, targetType: Object, data: {} } as any;
+  const dummyContext: MappingContext = { source: {}, targetType: Object as unknown as Constructor<unknown>, data: {} };
 
   describe('toUpperCase()', () => {
     const transform = Transformers.toUpperCase();
@@ -10,7 +11,7 @@ describe('Transformers', () => {
       expect(transform('hello', dummySource, dummyContext)).toBe('HELLO');
     });
     it('should return non-string as-is', () => {
-      expect(transform(42 as any, dummySource, dummyContext)).toBe(42);
+      expect(transform(42 as unknown as string, dummySource, dummyContext)).toBe(42);
     });
   });
 
@@ -20,7 +21,7 @@ describe('Transformers', () => {
       expect(transform('HELLO', dummySource, dummyContext)).toBe('hello');
     });
     it('should return non-string as-is', () => {
-      expect(transform(42 as any, dummySource, dummyContext)).toBe(42);
+      expect(transform(42 as unknown as string, dummySource, dummyContext)).toBe(42);
     });
   });
 
@@ -30,7 +31,7 @@ describe('Transformers', () => {
       expect(transform('  hello  ', dummySource, dummyContext)).toBe('hello');
     });
     it('should return non-string as-is', () => {
-      expect(transform(42 as any, dummySource, dummyContext)).toBe(42);
+      expect(transform(42 as unknown as string, dummySource, dummyContext)).toBe(42);
     });
   });
 
@@ -143,7 +144,25 @@ describe('Transformers', () => {
     });
     it('should return non-string as-is', () => {
       const obj = { a: 1 };
-      expect(transform(obj as any, dummySource, dummyContext)).toBe(obj);
+      expect(transform(obj as unknown as string, dummySource, dummyContext)).toBe(obj);
+    });
+    it('should throw when input exceeds maxLength', () => {
+      const bounded = Transformers.parseJSON(10);
+      expect(() => bounded('{"a":123456789}', dummySource, dummyContext)).toThrow('exceeds maximum of 10');
+    });
+    it('should parse input within maxLength', () => {
+      const bounded = Transformers.parseJSON<{ a: number }>(20);
+      expect(bounded('{"a":1}', dummySource, dummyContext)).toEqual({ a: 1 });
+    });
+    it('should truncate long invalid input in error message', () => {
+      const longInvalid = `{${'x'.repeat(300)}`;
+      try {
+        transform(longInvalid, dummySource, dummyContext);
+        fail('expected SyntaxError');
+      } catch (e) {
+        expect((e as Error).message).toContain('...');
+        expect((e as Error).message.length).toBeLessThan(130);
+      }
     });
   });
 
@@ -237,7 +256,7 @@ describe('Transformers', () => {
       expect(transform('a,b,c', dummySource, dummyContext)).toEqual(['a', 'b', 'c']);
     });
     it('should return empty array for non-string', () => {
-      expect(transform(42 as any, dummySource, dummyContext)).toEqual([]);
+      expect(transform(42 as unknown as string, dummySource, dummyContext)).toEqual([]);
     });
   });
 
@@ -247,7 +266,7 @@ describe('Transformers', () => {
       expect(transform(['a', 'b', 'c'], dummySource, dummyContext)).toBe('a-b-c');
     });
     it('should convert non-array to string', () => {
-      expect(transform('hello' as any, dummySource, dummyContext)).toBe('hello');
+      expect(transform('hello' as unknown as unknown[], dummySource, dummyContext)).toBe('hello');
     });
   });
 });

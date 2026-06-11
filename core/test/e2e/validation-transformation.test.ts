@@ -17,7 +17,7 @@ describe('Feature 2: Field Validation & Transformation', () => {
         source,
         UserDTO,
         [
-          { from: 'age', to: 'age', validate: ((v: unknown) => (v as number) >= 18) as any },
+          { from: 'age', to: 'age', validate: (v: unknown) => (v as number) >= 18 },
           { from: 'email', to: 'email', transform: Transformers.trim() },
         ],
         { strictMapping: false },
@@ -47,7 +47,7 @@ describe('Feature 2: Field Validation & Transformation', () => {
 
     it('should validate Date object via custom predicate', () => {
       const source = { date: new Date('2023-01-01') };
-      const isValidDate = ((v: unknown) => v instanceof Date && !Number.isNaN(v.getTime())) as any;
+      const isValidDate = (v: unknown): boolean => v instanceof Date && !Number.isNaN(v.getTime());
       const result = Objecter.convert(source, DateTarget, [{ from: 'date', to: 'date', validate: isValidDate }], {
         strictMapping: false,
       });
@@ -89,12 +89,10 @@ describe('Feature 2: Field Validation & Transformation', () => {
     it('should throw ValidationError when age < 18', () => {
       const source = { age: 15 };
       expect(() =>
-        Objecter.convert(
-          source,
-          UserDTO,
-          [{ from: 'age', to: 'age', validate: ((v: unknown) => (v as number) >= 18) as any }],
-          { strictMapping: false, throwOnValidationError: true },
-        ),
+        Objecter.convert(source, UserDTO, [{ from: 'age', to: 'age', validate: (v: unknown) => (v as number) >= 18 }], {
+          strictMapping: false,
+          throwOnValidationError: true,
+        }),
       ).toThrow(ValidationError);
     });
 
@@ -104,7 +102,7 @@ describe('Feature 2: Field Validation & Transformation', () => {
         Objecter.convert(
           source,
           DataTarget,
-          [{ from: 'data', to: 'data', transform: (v: unknown) => JSON.parse(v as string) }],
+          [{ from: 'data', to: 'data', transform: (v: unknown) => JSON.parse(v as string) as unknown }],
           { strictMapping: false },
         ),
       ).toThrow(MappingError);
@@ -112,7 +110,7 @@ describe('Feature 2: Field Validation & Transformation', () => {
 
     it('should reject NaN via custom validation', () => {
       const source = { age: Number.NaN };
-      const isFiniteNumber = ((v: unknown) => typeof v === 'number' && Number.isFinite(v)) as any;
+      const isFiniteNumber = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v);
       expect(() =>
         Objecter.convert(source, UserDTO, [{ from: 'age', to: 'age', validate: isFiniteNumber }], {
           strictMapping: false,

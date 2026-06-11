@@ -8,6 +8,7 @@ import {
 } from '../../../src/core/conversion-helpers';
 import { ValidationError } from '../../../src/errors/validation.error';
 import { DEFAULT_OPTIONS } from '../../../src/core/config-manager';
+import type { Constructor, MappingContext } from '../../../src/types';
 
 class Target {
   name = '';
@@ -89,6 +90,58 @@ describe('applyAutoMapping', () => {
     applyAutoMapping(null, target, Target, new Set(), opts);
     expect(target.name).toBe('');
   });
+
+  it('should skip own __proto__ key when target is Object (no prototype rewrite)', () => {
+    const source = JSON.parse('{"__proto__": {"polluted": true}, "name": "John"}') as Record<string, unknown>;
+    const target: Record<string, unknown> = {};
+    const opts = { ...DEFAULT_OPTIONS, autoMap: true };
+    applyAutoMapping(source, target, Object, new Set(), opts);
+    expect(target.name).toBe('John');
+    expect(Object.getPrototypeOf(target)).toBe(Object.prototype);
+    expect(target.polluted).toBeUndefined();
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it('should skip prototype key from auto-mapping', () => {
+    const source = JSON.parse('{"prototype": "evil", "name": "John"}') as Record<string, unknown>;
+    const target: Record<string, unknown> = {};
+    const opts = { ...DEFAULT_OPTIONS, autoMap: true };
+    applyAutoMapping(source, target, Object, new Set(), opts);
+    expect(target.name).toBe('John');
+    expect(target.prototype).toBeUndefined();
+  });
+
+  it('should apply a safe string excludePattern', () => {
+    const source = { name: 'John', _secret: 'hidden' };
+    const target: Record<string, unknown> = {};
+    const opts = { ...DEFAULT_OPTIONS, autoMap: true, excludePattern: '^_' };
+    applyAutoMapping(source, target, Object, new Set(), opts);
+    expect(target.name).toBe('John');
+    expect(target._secret).toBeUndefined();
+  });
+
+  it('should reject string excludePattern with nested quantifiers', () => {
+    const source = { name: 'John' };
+    const target: Record<string, unknown> = {};
+    const opts = { ...DEFAULT_OPTIONS, autoMap: true, excludePattern: '(a+)+$' };
+    expect(() => applyAutoMapping(source, target, Object, new Set(), opts)).toThrow('catastrophic backtracking');
+  });
+
+  it('should reject string excludePattern exceeding max length', () => {
+    const source = { name: 'John' };
+    const target: Record<string, unknown> = {};
+    const opts = { ...DEFAULT_OPTIONS, autoMap: true, excludePattern: 'a'.repeat(1001) };
+    expect(() => applyAutoMapping(source, target, Object, new Set(), opts)).toThrow('maximum length');
+  });
+
+  it('should accept a precompiled RegExp excludePattern without validation', () => {
+    const source = { aaa: 1, name: 'John' };
+    const target: Record<string, unknown> = {};
+    const opts = { ...DEFAULT_OPTIONS, autoMap: true, excludePattern: /(a+)+$/ };
+    applyAutoMapping(source, target, Object, new Set(), opts);
+    expect(target.name).toBe('John');
+    expect(target.aaa).toBeUndefined();
+  });
 });
 
 describe('throwValidationErrors', () => {
@@ -161,7 +214,7 @@ describe('prepareRuntimeOptions', () => {
   it('should merge context.data into options.context', () => {
     const result = prepareRuntimeOptions(
       { context: { locale: 'id' } },
-      { data: { userId: 1 }, source: {}, targetType: Object as any },
+      { data: { userId: 1 }, source: {}, targetType: Object as unknown as Constructor<unknown> } as MappingContext,
       DEFAULT_OPTIONS,
     );
     expect(result.context).toEqual({ locale: 'id', userId: 1 });
